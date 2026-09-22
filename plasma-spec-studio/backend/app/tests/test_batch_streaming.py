@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 
 import numpy as np
@@ -9,7 +10,7 @@ import pytest
 
 from app.core.line_shapes import voigt
 from app.core.spectrum import Spectrum
-from app.services.batch_manager import get_batch, list_batches, start_batch
+from app.services.batch_manager import get_batch, list_batches, start_batch, subscribe, unsubscribe
 from app.services.spectrum_service import save_spectrum
 
 
@@ -54,6 +55,56 @@ def test_streaming_batch_completes_and_emits_progress():
     assert types[0] == "started"
     assert types[-1] == "finished"
     assert types.count("progress") == 4
+
+
+def test_subscriber_receives_progress_when_started_from_a_running_loop():
+    """Regression test for the SSE-delivery bug: ``/api/batch/start`` is an
+    HTTP route, so ``start_batch()`` always runs *inside* a live asyncio
+    event loop (uvicorn's). The bug was that ``start_batch_route`` used to
+    be a plain ``def`` (sync) route, which FastAPI runs in a worker thread
+    with *no* running loop -- so ``asyncio.get_running_loop()`` raised, and
+    the fallback ``asyncio.new_event_loop()`` was never actually driven by
+    anyone. Every ``state.emit(...)`` call from the batch worker thread then
+    scheduled callbacks onto that dead loop, which silently never ran -- a
+    subscriber connected right after starting the batch (exactly what the
+    frontend does) would never receive a single event, even though the
+    batch itself completed fine server-side.
+
+    This reproduces the real scenario -- ``start_batch`` called from inside
+    a running loop, with a subscriber attached immediately after -- via
+    ``asyncio.run`` instead of going through the HTTP layer (SSE streaming
+    through TestClient's blocking portal is unreliable to drive from a sync
+    test). If the loop capture regresses, this test will hang/time out
+    rather than silently pass.
+    """
+
+    spectra = [_store_three_peak_spectrum(f"sse_{i}.csv", seed=20 + i) for i in range(2)]
+    recipe = {
+        "name": "sse-test",
+        "diagnostic": "peak_list",
+        "recipe_kind": "peak_list",
+        "peak_list": {"peaks": [{"label": "Hb", "center_nm": 486.135, "half_width_nm": 1.0}]},
+    }
+
+    async def scenario():
+        state = start_batch([s.id for s in spectra], recipe, max_workers=2)
+        queue = await subscribe(state)
+        try:
+            events = []
+            while True:
+                event = await asyncio.wait_for(queue.get(), timeout=30)
+                events.append(event)
+                if event["type"] in {"finished", "error"}:
+                    break
+            return events
+        finally:
+            unsubscribe(state, queue)
+
+    events = asyncio.run(scenario())
+    types = [event["type"] for event in events]
+    assert types[0] == "started"
+    assert types.count("progress") == 2
+    assert types[-1] == "finished"
 
 
 def test_get_batch_raises_for_unknown_id():

@@ -40,10 +40,13 @@ function releaseCandidates(filename: string) {
 }
 
 function findLocalArtifact(platform: Platform) {
-  if (platform === "windows" && !hasWindowsSidecar()) {
-    return null;
-  }
-
+  // Previously this gated on a `win-unpacked/resources/backend/...exe`
+  // sidecar path, which only exists for an unpacked `--dir` target build.
+  // The actual Windows installer (from `dist:win`, and what CI uploads to
+  // GitHub Releases) is just `release/*.exe` -- the loop below already
+  // checks for that file directly, so the extra gate only produced false
+  // 404s when a valid installer was present without also having a
+  // `win-unpacked` directory next to it.
   for (const filename of downloads[platform].filenames) {
     const candidate = releaseCandidates(filename).find((artifactPath) => existsSync(artifactPath));
     if (candidate) {
@@ -51,11 +54,6 @@ function findLocalArtifact(platform: Platform) {
     }
   }
   return null;
-}
-
-function hasWindowsSidecar() {
-  return releaseCandidates(path.join("win-unpacked", "resources", "backend", "plasma-spec-backend.exe"))
-    .some((artifactPath) => existsSync(artifactPath));
 }
 
 function artifactHeaders(platform: Platform, filename: string, size: number) {

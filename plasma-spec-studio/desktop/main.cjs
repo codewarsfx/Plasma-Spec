@@ -62,8 +62,10 @@ function startBackend() {
   }
   const storageDir = appDataPath("storage");
   const matplotlibDir = appDataPath("matplotlib");
+  const atomicDataDir = appDataPath("atomic");
   fs.mkdirSync(storageDir, { recursive: true });
   fs.mkdirSync(matplotlibDir, { recursive: true });
+  fs.mkdirSync(atomicDataDir, { recursive: true });
 
   const molecularDir = resourcePath("molecular");
   const env = {
@@ -71,6 +73,7 @@ function startBackend() {
     PLASMA_SPEC_HOST: HOST,
     PLASMA_SPEC_PORT: String(BACKEND_PORT),
     PLASMA_SPEC_STORAGE_DIR: storageDir,
+    PLASMA_SPEC_ATOMIC_DATA_DIR: atomicDataDir,
     PLASMA_SPEC_CORS_ORIGINS: `http://${HOST}:${FRONTEND_PORT},http://localhost:${FRONTEND_PORT}`,
     MPLCONFIGDIR: matplotlibDir,
   };
@@ -146,8 +149,23 @@ async function createWindow() {
     },
   });
 
+  // Exports/reports (ExportPanel.tsx, StudioResultsTable.tsx) link to the
+  // local backend via target="_blank"/window.open. Those used to be treated
+  // like any other "external" link -- shell.openExternal(url) -- which
+  // ejected the user out of the app into their OS browser just to download
+  // a CSV/PDF. Route same-origin-as-backend URLs through Electron's own
+  // download machinery instead (native Save dialog, stays in-app); keep
+  // openExternal for anything that isn't the app's own backend.
+  const backendOrigin = `http://${HOST}:${BACKEND_PORT}`;
+  mainWindow.webContents.session.on("will-download", (_event, item) => {
+    item.setSaveDialogOptions({ title: `Save ${item.getFilename()}` });
+  });
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    if (url.startsWith(`${backendOrigin}/`)) {
+      mainWindow.webContents.downloadURL(url);
+    } else {
+      shell.openExternal(url);
+    }
     return { action: "deny" };
   });
 

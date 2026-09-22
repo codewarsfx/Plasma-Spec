@@ -32,7 +32,7 @@ def run_batch_route(request: BatchRunRequest) -> dict:
 
 
 @router.post("/start")
-def start_batch_route(request: BatchRunRequest) -> dict:
+async def start_batch_route(request: BatchRunRequest) -> dict:
     """Start a batch in the background and return its identifier.
 
     Open ``/api/batch/{batch_id}/stream`` (SSE) for per-spectrum progress

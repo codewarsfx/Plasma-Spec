@@ -6,9 +6,10 @@ import json
 import os
 import re
 import sqlite3
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 import pandas as pd
 
@@ -272,11 +273,26 @@ def get_export_path(export_id: str) -> Path:
     return Path(row["path"])
 
 
-def _connect() -> sqlite3.Connection:
+@contextmanager
+def _connect() -> Iterator[sqlite3.Connection]:
+    # sqlite3.Connection's own context-manager protocol only commits/rolls
+    # back a transaction -- it does NOT close the connection, so `with
+    # _connect() as conn:` at every call site used to leak a connection
+    # object, relying on CPython refcounting (not a language guarantee) to
+    # eventually close it. Wrap it so every call site's `with` block still
+    # reads the same but now actually closes on exit, and set a
+    # busy_timeout so concurrent writers (e.g. a running batch plus a
+    # recipe/spectrum save) back off and retry instead of immediately
+    # raising "database is locked".
     STORAGE_ROOT.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    return conn
+    conn.execute("PRAGMA busy_timeout = 5000")
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
 
 
 def _now() -> str:

@@ -8,6 +8,7 @@ without touching the bundled file. Both files share the same schema.
 from __future__ import annotations
 
 import json
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -18,10 +19,21 @@ import pandas as pd
 
 DATABASE_ROOT = Path(__file__).resolve().parent
 BUNDLED_CSV = DATABASE_ROOT / "nist_lines.csv"
-NIST_LIVE_CSV = DATABASE_ROOT / "nist_live_lines.csv"
-USER_OVERRIDE_CSV = DATABASE_ROOT / "user_overrides.csv"
 DEMO_CSV = DATABASE_ROOT / "demo_atomic_lines.csv"
 SOURCES_JSON = DATABASE_ROOT / "sources.json"
+
+# Writable location for the NIST live-refresh cache and user overrides.
+# Defaults to DATABASE_ROOT (this module's own directory), which is fine for
+# dev/web where the backend runs from a normal writable checkout. It must be
+# overridden to a user-writable directory when the backend is frozen into a
+# read-only app bundle (desktop/main.cjs sets PLASMA_SPEC_ATOMIC_DATA_DIR to
+# a userData subfolder) -- otherwise these writes land inside PyInstaller's
+# onefile extraction dir and are silently gone on every restart.
+ATOMIC_DATA_DIR = Path(
+    os.environ.get("PLASMA_SPEC_ATOMIC_DATA_DIR", str(DATABASE_ROOT))
+).expanduser()
+NIST_LIVE_CSV = ATOMIC_DATA_DIR / "nist_live_lines.csv"
+USER_OVERRIDE_CSV = ATOMIC_DATA_DIR / "user_overrides.csv"
 SOURCE_PRIORITY = {"user": 0, "bundled": 1, "nist_live": 2, "demo": 3}
 
 REQUIRED_COLUMNS = ("species", "wavelength_air_nm")

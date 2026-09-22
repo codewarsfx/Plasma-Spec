@@ -128,10 +128,13 @@ def start_batch(
         _REGISTRY[batch_id] = state
 
     # Capture the calling event loop so worker threads can push events back.
+    # Must be called from an async route (or another context with a running
+    # loop) -- a freshly constructed loop that nobody ever runs would let
+    # `emit()` silently schedule callbacks that never execute.
     try:
         state._loop = asyncio.get_running_loop()
     except RuntimeError:
-        state._loop = asyncio.new_event_loop()
+        state._loop = None
 
     thread = threading.Thread(
         target=_run_batch_in_thread,

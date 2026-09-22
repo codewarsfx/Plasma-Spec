@@ -230,9 +230,9 @@ def _report_title(result: dict[str, Any]) -> str:
 def _report_subtitle(result: dict[str, Any]) -> str:
     parts: list[str] = []
     window = result.get("window_nm")
-    if isinstance(window, (list, tuple)) and len(window) == 2:
+    if isinstance(window, (list, tuple)) and len(window) == 2 and None not in window:
         parts.append(f"window {window[0]:.1f}-{window[1]:.1f} nm")
-    if "Tg_K" in result:
+    if result.get("Tg_K") is not None:
         parts.append(f"Tg = {result['Tg_K']:.0f} K")
     if result.get("species"):
         parts.append(f"species {result['species']}")

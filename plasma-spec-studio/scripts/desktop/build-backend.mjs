@@ -65,17 +65,37 @@ const molecularCandidates = [
   path.join(root, "Molecular Line Data"),
 ];
 const molecularSource = molecularCandidates.find((candidate) => existsSync(candidate));
+let bundledDbCount = 0;
 if (molecularSource) {
   for (const entry of readdirSync(molecularSource)) {
     if (entry.toLowerCase().endsWith(".db")) {
       cpSync(path.join(molecularSource, entry), path.join(molecularOut, entry));
+      bundledDbCount += 1;
     }
   }
-} else {
+}
+if (bundledDbCount === 0) {
+  // Packaging used to silently drop a README.txt placeholder here and let
+  // the build "succeed" -- every installer built that way ships with
+  // molecular band fitting completely broken (every OH/N2/NO/N2+ fit
+  // request 404s) with nothing in the build log calling that out. Fail
+  // loudly instead: whoever is cutting a release needs to either provide
+  // the databases or explicitly acknowledge they're shipping without them.
   writeFileSync(
     path.join(molecularOut, "README.txt"),
     "Place MassiveOES SQLite .db molecular databases here before packaging if you want validated molecular band fits bundled.\n",
   );
+  const message =
+    "No molecular .db files found (looked in: " +
+    molecularCandidates.join(", ") +
+    "). This build would ship with molecular band fitting completely broken. " +
+    "Provide the databases, or set PLASMA_SPEC_ALLOW_MISSING_MOLECULAR_DB=1 to " +
+    "intentionally build a demo-only package without them.";
+  if (process.env.PLASMA_SPEC_ALLOW_MISSING_MOLECULAR_DB === "1") {
+    console.warn(`[build-backend] WARNING: ${message}`);
+  } else {
+    throw new Error(`[build-backend] ${message}`);
+  }
 }
 
 console.log(`Prepared backend desktop bundle at ${backendOut}`);

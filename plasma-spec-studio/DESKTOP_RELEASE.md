@@ -72,19 +72,41 @@ Build the Windows installer on Windows, not by cross-building from macOS. The Wi
 - `desktop-dist/frontend`: Next.js standalone server and static assets
 - `desktop-dist/backend`: PyInstaller backend executable
 - `desktop-dist/molecular`: MassiveOES-style SQLite molecular line databases
-- backend storage is created per user under the desktop app's user-data directory
+- backend storage (spectra, exports, recipes) and the NIST live-refresh cache / user atomic-line overrides are created per user under the desktop app's user-data directory (`app.getPath("userData")`), not inside the read-only `.app` bundle
+
+`npm run desktop:build:backend` looks for the molecular `.db` files in a sibling `Molecular Line Data/` folder next to this repo (gitignored -- it's real lab data, not tracked in git). **The build now fails loudly if it can't find them**, since a "successful" build without them ships with molecular band fitting completely broken. If you're intentionally building a demo-only package, set `PLASMA_SPEC_ALLOW_MISSING_MOLECULAR_DB=1` to acknowledge that and continue anyway. `.github/workflows/desktop-release.yml` only checks out this repo, so CI has no access to that data either -- until it's provided as a secret/private artifact step in that workflow, CI desktop builds will fail this check rather than silently ship broken installers.
 
 ## Public Distribution Checklist
 
 Internal unsigned builds are useful for lab testing, but public downloads should add:
 
-- Apple Developer ID certificate
-- macOS notarization credentials
+- Apple Developer ID certificate (`CSC_LINK` + `CSC_KEY_PASSWORD`, or `CSC_NAME`, for electron-builder)
+- macOS notarization credentials (see below -- the hook exists, but does nothing without these)
 - Windows code-signing certificate
 - clean-machine install tests on Windows 10/11 and macOS Intel/Apple Silicon
 - an update strategy, such as GitHub Releases plus a signed auto-updater
 
 Without signing, Windows SmartScreen and macOS Gatekeeper can warn users even when the installer is technically valid.
+
+### macOS notarization
+
+`npm run dist:mac` (real Developer-ID-signed builds, not `:local`) runs `scripts/desktop/notarize.cjs` as electron-builder's `afterSign` hook. It only submits to Apple's notary service when it finds credentials in the environment -- either:
+
+```bash
+APPLE_API_KEY=...        # path to the .p8 key, or its contents depending on your CI setup
+APPLE_API_KEY_ID=...
+APPLE_API_ISSUER=...
+```
+
+or:
+
+```bash
+APPLE_ID=you@example.com
+APPLE_APP_SPECIFIC_PASSWORD=...   # generated at appleid.apple.com, not your account password
+APPLE_TEAM_ID=...
+```
+
+Without one of those sets, the hook logs a warning and skips notarization -- the build still "succeeds," but the resulting DMG will be Gatekeeper-blocked for anyone besides the machine that built it. `.github/workflows/desktop-release.yml` does not currently set any of these secrets, so **GitHub-released DMGs are not notarized today**; add the secrets to the repo and pass them through to the `dist:mac` step to close that gap.
 
 ## macOS "Damaged App" During Local Testing
 

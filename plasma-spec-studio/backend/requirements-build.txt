@@ -1,2 +1,8 @@
 -r requirements.txt
 pyinstaller>=6.11
+# Supplies the PyInstaller hooks that correctly bundle scipy/pandas/openpyxl
+# (used throughout app/services and app/analysis). It rides in today only as
+# an unpinned transitive dependency of pyinstaller, so which hooks apply
+# depends on whatever version pip happens to resolve on the build machine --
+# pin it explicitly so desktop builds are reproducible across dev/CI.
+pyinstaller-hooks-contrib>=2024.8
