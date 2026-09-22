@@ -30,7 +30,7 @@ def _default_cors_origins() -> str:
 app = FastAPI(
     title=SOFTWARE_NAME,
     version=SOFTWARE_VERSION,
-    description="Research-grade OES analysis for nanosecond-pulsed gas-liquid plasma experiments.",
+    description="Research-grade OES analysis for low-temperature plasma diagnostics.",
 )
 
 app.add_middleware(

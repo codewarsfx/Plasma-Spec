@@ -4,7 +4,7 @@
   "database_kind": "validated",
   "primary_source": "NIST Atomic Spectra Database (https://physics.nist.gov/asd)",
   "notes": [
-    "Curated subset of NIST ASD lines most relevant to gas-liquid plasma OES: H I (Balmer/Paschen alpha), He I, Ar I and Ar II, O I and O II, N I and N II.",
+    "Curated subset of NIST ASD lines most relevant to low-temperature plasma OES: H I (Balmer/Paschen alpha), He I, Ar I and Ar II, O I and O II, N I and N II.",
     "Einstein A coefficients are reported as published by NIST ASD (accuracy flags follow NIST conventions: A+ < 2%, A < 3%, B+ < 7%, B < 10%, C < 25%, D <= 50%).",
     "H I A_ki values are summed over fine-structure manifolds and follow Wiese & Fuhr 2009.",
     "Use POST /api/databases/atomic/refresh to pull additional official NIST ASD lines into nist_live_lines.csv. User overrides live alongside this bundle in user_overrides.csv if present and are merged last."

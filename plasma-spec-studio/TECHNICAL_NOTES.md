@@ -221,7 +221,7 @@ The two-Voigt fit collapses to identical Lorentzian widths on `1khz-argon` → t
 
 ## 5. Atomic line identification
 
-The bundled catalog (`backend/app/databases/atomic/nist_lines.csv`) is a curated subset of NIST ASD covering the species most relevant to gas-liquid plasma OES:
+The bundled catalog (`backend/app/databases/atomic/nist_lines.csv`) is a curated subset of NIST ASD covering the species most relevant to low-temperature plasma OES:
 
 - **H I**: Balmer α-ε, Paschen α (with summed-manifold Einstein coefficients from Wiese & Fuhr 2009)
 - **He I**: 388.9, 447.1, 492.2, 501.6, 587.6 (D3), 667.8, 706.5, 728.1

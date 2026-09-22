@@ -8,7 +8,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "PlasmaSpec Studio",
-  description: "Nanosecond-pulsed gas-liquid plasma OES fitting platform",
+  description: "Low-temperature plasma OES fitting platform",
 };
 
 // /analysis has been folded into /studio (workstation supersedes it).
@@ -56,7 +56,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 </div>
                 <div>
                   <div className="text-base font-semibold text-ink">PlasmaSpec Studio</div>
-                  <div className="hidden text-xs text-slate-500 sm:block">OES fitting for ns-pulsed gas-liquid plasma</div>
+                  <div className="hidden text-xs text-slate-500 sm:block">OES fitting for low-temperature plasma</div>
                 </div>
               </Link>
               <nav className="hidden flex-wrap gap-1 md:flex">

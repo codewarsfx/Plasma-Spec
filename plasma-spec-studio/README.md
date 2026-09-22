@@ -1,6 +1,6 @@
 # PlasmaSpec Studio
 
-An optical-emission-spectroscopy diagnostics workstation for nanosecond-pulsed gas-liquid plasma experiments. Inspired by SpecAir and MassiveOES; built as a single-page workstation that goes from raw spectrum to traceable diagnostics with every intermediate value visible.
+An optical-emission-spectroscopy diagnostics workstation for low-temperature plasma experiments. Inspired by SpecAir and MassiveOES; built as a single-page workstation that goes from raw spectrum to traceable diagnostics with every intermediate value visible.
 
 ## What it does
 
@@ -109,7 +109,7 @@ The repository includes 14 real spectra plus 3 synthetic demo spectra:
 
 ## Databases
 
-**Atomic catalog** (`backend/app/databases/atomic/nist_lines.csv`) — bundled NIST-derived subset (~55 lines) of the species most relevant to gas-liquid plasma OES. The Line Database panel can refresh official NIST ASD coverage on demand into `nist_live_lines.csv` for any species/range, and `user_overrides.csv` still sits on top for manual corrections or lab-specific lines.
+**Atomic catalog** (`backend/app/databases/atomic/nist_lines.csv`) — bundled NIST-derived subset (~55 lines) of the species most relevant to low-temperature plasma OES. The Line Database panel can refresh official NIST ASD coverage on demand into `nist_live_lines.csv` for any species/range, and `user_overrides.csv` still sits on top for manual corrections or lab-specific lines.
 
 **Molecular databases** (`Molecular Line Data/*.db`, one level above this directory) — provided MassiveOES-style SQLite line lists:
 

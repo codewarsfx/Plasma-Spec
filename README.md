@@ -1,10 +1,10 @@
 # Plasma Spec App
 
 A research repository for optical-emission-spectroscopy (OES) diagnostics of
-nanosecond-pulsed gas–liquid plasma. The centerpiece is **PlasmaSpec
-Studio**, a full-stack diagnostics workstation that takes a raw spectrum all
-the way to traceable, publication-ready plasma parameters — with every
-intermediate value visible along the way.
+low-temperature plasmas. The centerpiece is **PlasmaSpec Studio**, a
+full-stack diagnostics workstation that takes a raw spectrum all the way to
+traceable, publication-ready plasma parameters — with every intermediate
+value visible along the way.
 
 ## What's in here
 
@@ -16,7 +16,8 @@ intermediate value visible along the way.
 ## PlasmaSpec Studio, in brief
 
 Inspired by SpecAir and MassiveOES, PlasmaSpec Studio is built as a
-single-page workstation for nanosecond-pulsed gas–liquid plasma experiments:
+single-page workstation for low-temperature plasma diagnostics (e.g.
+atmospheric-pressure jets, DBDs, nanosecond-pulsed and gas–liquid discharges):
 
 - **Import & QA** — CSV/TXT/TSV/ASC/DAT/XLSX spectra with auto-detected
   columns, Avantes metadata parsing, and pre-fit spectrum quality checks.
