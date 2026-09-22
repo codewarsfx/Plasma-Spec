@@ -1,0 +1,4 @@
+filename,gas,liquid,pfas_concentration_ppm,methanol_concentration,pulse_mode,uniform_frequency_khz,internal_frequency_khz,burst_period_ms,n_cycles,voltage_kv,gate_delay_ns,gate_width_ns,replicate,date
+demo_ns_plasma_500khz_10cycles.csv,Ar,PFOS demo,5,0.1 mM,burst,,500,0.5,10,14,100,50,1,2026-05-02
+demo_ns_plasma_500khz_20cycles.csv,Ar,PFOS demo,5,0.1 mM,burst,,500,0.5,20,14,100,50,1,2026-05-02
+demo_ns_plasma_750khz_20cycles.csv,Ar,PFOS demo,5,0.1 mM,burst,,750,0.4,20,14,100,50,1,2026-05-02

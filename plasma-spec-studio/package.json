@@ -1,0 +1,86 @@
+{
+  "name": "plasma-spec-studio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Desktop packaging for PlasmaSpec Studio.",
+  "main": "desktop/main.cjs",
+  "author": "PlasmaSpec Studio",
+  "scripts": {
+    "desktop:build:frontend": "node scripts/desktop/build-frontend.mjs",
+    "desktop:build:backend": "node scripts/desktop/build-backend.mjs",
+    "desktop:clean:release": "node scripts/desktop/clean-release.mjs",
+    "desktop:prepare": "npm run desktop:build:frontend && npm run desktop:build:backend",
+    "desktop:dev": "electron .",
+    "dist:mac": "npm run desktop:prepare && npm run desktop:clean:release && electron-builder --mac dmg",
+    "dist:mac:local": "npm run desktop:prepare && npm run desktop:clean:release && PLASMA_SPEC_ADHOC_SIGN=1 CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg",
+    "dist:win": "npm run desktop:prepare && npm run desktop:clean:release && electron-builder --win nsis",
+    "dist:dir": "npm run desktop:prepare && npm run desktop:clean:release && electron-builder --dir"
+  },
+  "build": {
+    "appId": "com.plasmaspec.studio",
+    "productName": "PlasmaSpec Studio",
+    "directories": {
+      "output": "release"
+    },
+    "afterPack": "scripts/desktop/after-pack.cjs",
+    "files": [
+      "desktop/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "desktop-dist/backend",
+        "to": "backend"
+      },
+      {
+        "from": "desktop-dist/frontend",
+        "to": "frontend"
+      },
+      {
+        "from": "desktop-dist/molecular",
+        "to": "molecular"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.education",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "desktop/entitlements.mac.plist",
+      "entitlementsInherit": "desktop/entitlements.mac.plist"
+    },
+    "dmg": {
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "${productName}-${version}-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8"
+  }
+}

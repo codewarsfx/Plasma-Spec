@@ -1,0 +1,13 @@
+species,wavelength_nm,transition,type,notes
+H,486.13,Hbeta,atomic,Balmer beta line; demo assignment only
+H,656.28,Halpha,atomic,Balmer alpha line; demo assignment only
+O,777.30,O I 777 nm multiplet,atomic,Approximate oxygen multiplet center; demo assignment only
+O,844.60,O I 844 nm,atomic,Approximate oxygen line; demo assignment only
+N2,337.10,N2(C-B) second positive band head,molecular,Approximate band head; demo assignment only
+N2+,391.40,N2+ first negative band,molecular,Approximate band; demo assignment only
+Ar,696.54,Ar I,atomic,Common argon line; demo assignment only
+Ar,706.72,Ar I,atomic,Common argon line; demo assignment only
+Ar,750.39,Ar I,atomic,Common argon line; demo assignment only
+Ar,763.51,Ar I,atomic,Common argon line; demo assignment only
+Ar,811.53,Ar I,atomic,Common argon line; demo assignment only
+

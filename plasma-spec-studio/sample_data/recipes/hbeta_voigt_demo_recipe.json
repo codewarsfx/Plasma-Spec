@@ -1,0 +1,46 @@
+{
+  "name": "Hbeta Voigt 484-488 nm demo",
+  "diagnostic": "hbeta_voigt",
+  "window_nm": [
+    484,
+    488
+  ],
+  "preprocessing": [
+    {
+      "operation": "crop",
+      "params": {
+        "window_nm": [
+          484,
+          488
+        ]
+      }
+    },
+    {
+      "operation": "baseline_als",
+      "params": {
+        "lambda": 100000,
+        "p": 0.01
+      }
+    }
+  ],
+  "fit_model": "voigt",
+  "fit_parameters": {
+    "center_bounds": [
+      485.8,
+      486.4
+    ],
+    "sigma_bounds": [
+      0.001,
+      1.0
+    ],
+    "gamma_bounds": [
+      0.001,
+      1.0
+    ]
+  },
+  "exports": [
+    "fit_params",
+    "fit_quality",
+    "plots"
+  ]
+}

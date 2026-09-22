@@ -1,0 +1,8 @@
+{
+  "name": "N2(C-B) second positive demo transitions",
+  "database_kind": "demo",
+  "version": "demo-0.1",
+  "warning": "Demo database used. Results are for software testing only and should not be interpreted as validated plasma temperatures.",
+  "notes": "Small synthetic transition list for software validation only. Tvib is not validated with this demo data."
+}
+

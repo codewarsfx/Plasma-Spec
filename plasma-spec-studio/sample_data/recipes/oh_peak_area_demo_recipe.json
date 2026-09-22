@@ -1,0 +1,32 @@
+{
+  "name": "OH area tracking demo",
+  "diagnostic": "peak_area",
+  "peak_name": "OH band",
+  "window_nm": [
+    306,
+    312
+  ],
+  "preprocessing": [
+    {
+      "operation": "crop",
+      "params": {
+        "window_nm": [
+          306,
+          312
+        ]
+      }
+    },
+    {
+      "operation": "baseline_als",
+      "params": {
+        "lambda": 100000,
+        "p": 0.01
+      }
+    }
+  ],
+  "fit_parameters": {},
+  "exports": [
+    "fit_params",
+    "fit_quality"
+  ]
+}
