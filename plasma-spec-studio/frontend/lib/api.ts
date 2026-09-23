@@ -17,14 +17,21 @@ import type {
   SpectrumSummary,
 } from "./types";
 
+import { getCachedAccessToken } from "./supabase/client";
+
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
+
+function authHeaders(): Record<string, string> {
+  const token = getCachedAccessToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: init?.body instanceof FormData
-      ? init.headers
-      : { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+      ? { ...authHeaders(), ...(init.headers ?? {}) }
+      : { "Content-Type": "application/json", ...authHeaders(), ...(init?.headers ?? {}) },
   });
   if (!response.ok) {
     let detail = response.statusText;
@@ -225,7 +232,12 @@ export function getBatchResult(batchId: string) {
 }
 
 export function batchStreamUrl(batchId: string) {
-  return `${API_BASE}/api/batch/${batchId}/stream`;
+  // EventSource can't set an Authorization header, so the token (when
+  // present) rides along as a query param; app/auth.py's `authenticated`
+  // dependency accepts either.
+  const token = getCachedAccessToken();
+  const query = token ? `?token=${encodeURIComponent(token)}` : "";
+  return `${API_BASE}/api/batch/${batchId}/stream${query}`;
 }
 
 export function exportResult(result: FitResult, formats: Array<"json" | "csv" | "png">) {
@@ -247,5 +259,10 @@ export function listResults() {
 }
 
 export function exportUrl(exportId: string) {
-  return `${API_BASE}/api/exports/${exportId}`;
+  // Same reasoning as batchStreamUrl(): this is used as a plain <a href> /
+  // window.open() target, not a fetch() through request(), so it can't
+  // carry an Authorization header either.
+  const token = getCachedAccessToken();
+  const query = token ? `?token=${encodeURIComponent(token)}` : "";
+  return `${API_BASE}/api/exports/${exportId}${query}`;
 }

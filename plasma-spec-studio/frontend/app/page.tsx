@@ -30,7 +30,7 @@ const diagnostics = [
   {
     icon: Activity,
     title: "Molecular band fitting",
-    body: "MassiveOES-style SQLite databases for OH(A-X), N2(C-B), N2+(B-X), NH(A-X), and NO(B-X), with Trot/Tvib and state-by-state population workflows.",
+    body: "Validated molecular line databases for OH(A-X), N2(C-B), N2+(B-X), NH(A-X), and NO(B-X), with Trot/Tvib and state-by-state population workflows.",
   },
   {
     icon: Gauge,
@@ -90,7 +90,7 @@ const requirements = [
 
 const trustItems = [
   "NIST-derived atomic line catalog with optional live ASD refresh coverage",
-  "Provided MassiveOES-style molecular line databases bundled into desktop builds",
+  "Validated molecular line databases bundled into desktop builds",
   "Explicit labels for reference-backed, software-tested, lab-port, and validation status",
   "No hidden black-box correction layer: fit parameters, assumptions, and warnings stay visible",
 ];

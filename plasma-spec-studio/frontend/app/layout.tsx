@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { BarChart3, Database, FlaskConical, Layers, Microscope, MonitorDown, Upload } from "lucide-react";
+import { AuthButton } from "@/components/AuthButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ToastHost } from "@/components/Toast";
 import "./globals.css";
@@ -72,7 +73,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                   </Link>
                 ))}
               </nav>
-              <ThemeToggle />
+              <div className="flex items-center gap-2">
+                <AuthButton />
+                <ThemeToggle />
+              </div>
             </div>
           </header>
           <main className="w-full">{children}</main>

@@ -16,3 +16,6 @@ backend/storage/spectra/*.csv
 backend/storage/exports/*
 !.gitkeep
 Molecular Line Data/
+desktop/env.generated.cjs
+backend/.env
+frontend/.env.local

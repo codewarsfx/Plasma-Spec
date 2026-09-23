@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.auth import AuthedUser, authenticated
 from app.preprocessing.pipeline import apply_preprocessing_operations
 from app.schemas.spectrum_schema import PreprocessRequest, PreprocessResponse
 from app.services.export_service import export_processed_spectrum_csv
@@ -14,7 +15,7 @@ router = APIRouter(prefix="/api", tags=["preprocessing"])
 
 
 @router.post("/preprocess", response_model=PreprocessResponse)
-def preprocess_spectrum(request: PreprocessRequest) -> dict:
+def preprocess_spectrum(request: PreprocessRequest, user: AuthedUser = Depends(authenticated)) -> dict:
     try:
         spectrum = get_spectrum(request.spectrum_id)
         background = get_spectrum(request.background_spectrum_id) if request.background_spectrum_id else None
@@ -33,7 +34,7 @@ def preprocess_spectrum(request: PreprocessRequest) -> dict:
 
 
 @router.post("/preprocess/export-csv")
-def export_processed(request: PreprocessRequest) -> dict:
+def export_processed(request: PreprocessRequest, user: AuthedUser = Depends(authenticated)) -> dict:
     try:
         spectrum = get_spectrum(request.spectrum_id)
         processed = apply_preprocessing_operations(

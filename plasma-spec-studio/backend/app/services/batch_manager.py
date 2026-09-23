@@ -23,6 +23,7 @@ from typing import Any, Iterable
 from uuid import uuid4
 
 from app.core.fitting_utils import flatten_result_for_csv
+from app.services.backends.base import Store, get_current_store, set_current_store, use_store
 from app.services.batch_service import (
     _long_form_rows,
     _resolve_recipe_kind,
@@ -136,9 +137,16 @@ def start_batch(
     except RuntimeError:
         state._loop = None
 
+    # Capture the caller's active Store (local or Supabase) so the worker
+    # thread -- and the ThreadPoolExecutor threads it spawns -- write fit
+    # results as the right user. contextvars don't propagate across plain
+    # threading.Thread/ThreadPoolExecutor boundaries the way they do across
+    # asyncio tasks, so this has to be threaded through explicitly.
+    store = get_current_store()
+
     thread = threading.Thread(
         target=_run_batch_in_thread,
-        args=(state, spectrum_ids, recipe, max_workers),
+        args=(state, spectrum_ids, recipe, max_workers, store),
         daemon=True,
         name=f"batch-{batch_id[:8]}",
     )
@@ -177,9 +185,16 @@ def _run_batch_in_thread(
     spectrum_ids: list[str],
     recipe: dict[str, Any],
     max_workers: int | None,
+    store: Store,
 ) -> None:
     """Run the batch with optional thread-level parallelism."""
 
+    # A fresh threading.Thread starts with no ambient store; this thread
+    # owns itself for its whole life (it isn't pooled/reused), so a plain
+    # set (no reset) is correct here -- ThreadPoolExecutor workers below
+    # (which ARE reused across submissions) instead use use_store() inside
+    # _run_one() itself.
+    set_current_store(store)
     try:
         rows: list[dict[str, Any]] = []
         results: list[dict[str, Any]] = []
@@ -202,7 +217,7 @@ def _run_batch_in_thread(
 
         with ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="batchfit") as pool:
             futures = {
-                pool.submit(_run_one, spectrum_id, recipe, state.recipe_kind): spectrum_id
+                pool.submit(_run_one, spectrum_id, recipe, state.recipe_kind, store): spectrum_id
                 for spectrum_id in spectrum_ids
             }
             for future in _as_completed_in_order(futures):
@@ -304,16 +319,22 @@ def _run_batch_in_thread(
 
 
 def _run_one(
-    spectrum_id: str, recipe: dict[str, Any], recipe_kind: str
+    spectrum_id: str, recipe: dict[str, Any], recipe_kind: str, store: Store
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    """Run a single spectrum's analysis and produce its long-form rows."""
+    """Run a single spectrum's analysis and produce its long-form rows.
 
-    spectrum = get_spectrum(spectrum_id)
-    preprocessing = recipe.get("preprocessing") or []
-    if preprocessing:
-        spectrum = apply_preprocessing_operations(spectrum, preprocessing)
-    result = _run_recipe_on_spectrum(spectrum, recipe, recipe_kind)
-    rows = _long_form_rows(result, spectrum, recipe_kind)
+    Runs on a ThreadPoolExecutor worker thread, which starts with no
+    ambient store of its own -- make ``store`` (the batch's owner) current
+    for this thread before touching anything in spectrum_service.
+    """
+
+    with use_store(store):
+        spectrum = get_spectrum(spectrum_id)
+        preprocessing = recipe.get("preprocessing") or []
+        if preprocessing:
+            spectrum = apply_preprocessing_operations(spectrum, preprocessing)
+        result = _run_recipe_on_spectrum(spectrum, recipe, recipe_kind)
+        rows = _long_form_rows(result, spectrum, recipe_kind)
     return result, rows
 
 

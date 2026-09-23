@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.auth import AuthedUser, authenticated
 from app.schemas.fitting_schema import (
     AtomicForwardFitRequest,
     ElectronDensityRequest,
@@ -34,7 +35,7 @@ router = APIRouter(prefix="/api", tags=["fitting"])
 
 
 @router.post("/fit/hbeta", response_model=FitResultResponse)
-def fit_hbeta_route(request: HbetaFitRequest) -> dict:
+def fit_hbeta_route(request: HbetaFitRequest, user: AuthedUser = Depends(authenticated)) -> dict:
     try:
         return fit_hbeta_by_id(request.spectrum_id, request.model_dump())
     except Exception as exc:
@@ -42,7 +43,7 @@ def fit_hbeta_route(request: HbetaFitRequest) -> dict:
 
 
 @router.post("/fit/oh", response_model=FitResultResponse)
-def fit_oh_route(request: MolecularFitRequest) -> dict:
+def fit_oh_route(request: MolecularFitRequest, user: AuthedUser = Depends(authenticated)) -> dict:
     try:
         data = request.model_dump()
         if not data.get("window_nm"):
@@ -53,7 +54,7 @@ def fit_oh_route(request: MolecularFitRequest) -> dict:
 
 
 @router.post("/fit/n2", response_model=FitResultResponse)
-def fit_n2_route(request: MolecularFitRequest) -> dict:
+def fit_n2_route(request: MolecularFitRequest, user: AuthedUser = Depends(authenticated)) -> dict:
     try:
         data = request.model_dump()
         if not data.get("window_nm"):
@@ -64,7 +65,7 @@ def fit_n2_route(request: MolecularFitRequest) -> dict:
 
 
 @router.post("/fit/molecular", response_model=FitResultResponse)
-def fit_molecular_route(request: UnifiedMolecularFitRequest) -> dict:
+def fit_molecular_route(request: UnifiedMolecularFitRequest, user: AuthedUser = Depends(authenticated)) -> dict:
     """Unified molecular fit for any species in the SQLite registry."""
 
     try:
@@ -75,7 +76,9 @@ def fit_molecular_route(request: UnifiedMolecularFitRequest) -> dict:
 
 
 @router.post("/fit/molecular/state-by-state", response_model=FitResultResponse)
-def fit_molecular_state_by_state_route(request: StateByStateMolecularFitRequest) -> dict:
+def fit_molecular_state_by_state_route(
+    request: StateByStateMolecularFitRequest, user: AuthedUser = Depends(authenticated)
+) -> dict:
     """Temperature-independent molecular state-population fit."""
 
     try:
@@ -86,7 +89,7 @@ def fit_molecular_state_by_state_route(request: StateByStateMolecularFitRequest)
 
 
 @router.post("/fit/atomic-forward", response_model=FitResultResponse)
-def fit_atomic_forward_route(request: AtomicForwardFitRequest) -> dict:
+def fit_atomic_forward_route(request: AtomicForwardFitRequest, user: AuthedUser = Depends(authenticated)) -> dict:
     """Relative NIST-backed atomic forward model."""
 
     try:
@@ -97,7 +100,7 @@ def fit_atomic_forward_route(request: AtomicForwardFitRequest) -> dict:
 
 
 @router.post("/diagnostics/electron-density", response_model=FitResultResponse)
-def electron_density_route(request: ElectronDensityRequest) -> dict:
+def electron_density_route(request: ElectronDensityRequest, user: AuthedUser = Depends(authenticated)) -> dict:
     """H-alpha (Gigosos) electron density - port of the lab MATLAB workflow."""
 
     try:
@@ -107,7 +110,7 @@ def electron_density_route(request: ElectronDensityRequest) -> dict:
 
 
 @router.post("/analyze/peak-area", response_model=FitResultResponse)
-def peak_area_route(request: PeakAreaRequest) -> dict:
+def peak_area_route(request: PeakAreaRequest, user: AuthedUser = Depends(authenticated)) -> dict:
     try:
         return analyze_peak_by_id(request.spectrum_id, request.model_dump())
     except Exception as exc:
@@ -115,7 +118,7 @@ def peak_area_route(request: PeakAreaRequest) -> dict:
 
 
 @router.post("/analyze/peak-list")
-def peak_list_route(request: PeakListRequest) -> dict:
+def peak_list_route(request: PeakListRequest, user: AuthedUser = Depends(authenticated)) -> dict:
     try:
         return analyze_peak_list_by_id(request.spectrum_id, request.model_dump())
     except Exception as exc:
@@ -123,7 +126,7 @@ def peak_list_route(request: PeakListRequest) -> dict:
 
 
 @router.post("/identify-lines")
-def identify_lines_route(request: LineIdentificationRequest) -> dict:
+def identify_lines_route(request: LineIdentificationRequest, user: AuthedUser = Depends(authenticated)) -> dict:
     try:
         return identify_lines_by_id(request.spectrum_id, request.model_dump())
     except Exception as exc:

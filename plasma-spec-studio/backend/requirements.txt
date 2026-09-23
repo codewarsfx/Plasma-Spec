@@ -9,3 +9,6 @@ openpyxl>=3.1
 matplotlib>=3.8
 pytest>=8.0
 httpx>=0.28
+supabase>=2.9
+pyjwt>=2.9
+python-dotenv>=1.0

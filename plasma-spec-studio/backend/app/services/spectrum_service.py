@@ -1,17 +1,19 @@
-"""Local SQLite plus file-backed spectrum storage."""
+"""Spectrum, fit-result, and export persistence.
+
+This module is a thin, backend-agnostic facade: every function delegates to
+whichever ``Store`` is active for the current request (see
+``app.services.backends.base.get_current_store``) -- local SQLite by
+default, or Supabase when ``PLASMA_SPEC_STORAGE_BACKEND=supabase`` and a
+request carries an authenticated user. Callers (routes, fitting_service,
+batch_service, batch_manager, export_service, report_service) are unchanged
+from before Supabase support existed.
+"""
 
 from __future__ import annotations
 
-import json
-import os
 import re
-import sqlite3
-from contextlib import contextmanager
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterator
-
-import pandas as pd
+from typing import Any
 
 from app.core.spectrum import Spectrum
 from app.preprocessing.filename_metadata import extract_from_filename
@@ -20,96 +22,34 @@ from app.preprocessing.importers import (
     load_spectrum_excel,
     load_spectrum_text,
 )
+from app.services.backends.base import get_current_store
+from app.services.backends.local_store import EXPORTS_DIR, SPECTRA_DIR, STORAGE_ROOT
 
 
-BACKEND_ROOT = Path(__file__).resolve().parents[2]
-STORAGE_ROOT = Path(
-    os.environ.get("PLASMA_SPEC_STORAGE_DIR", str(BACKEND_ROOT / "storage"))
-).expanduser()
-SPECTRA_DIR = STORAGE_ROOT / "spectra"
-EXPORTS_DIR = STORAGE_ROOT / "exports"
-DB_PATH = STORAGE_ROOT / "plasma_spec_studio.sqlite3"
+__all__ = [
+    "EXPORTS_DIR",
+    "SPECTRA_DIR",
+    "STORAGE_ROOT",
+    "initialize_storage",
+    "save_spectrum",
+    "save_uploaded_spectrum",
+    "get_spectrum",
+    "list_spectra",
+    "save_fit_result",
+    "list_fit_results",
+    "save_export_record",
+    "get_export_bytes",
+]
 
 
 def initialize_storage() -> None:
-    """Create local storage directories and SQLite tables."""
-
-    SPECTRA_DIR.mkdir(parents=True, exist_ok=True)
-    EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    with _connect() as conn:
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS spectra (
-                id TEXT PRIMARY KEY,
-                filename TEXT NOT NULL,
-                array_path TEXT NOT NULL,
-                metadata_json TEXT NOT NULL,
-                preprocessing_history_json TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS recipes (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                diagnostic TEXT NOT NULL,
-                recipe_json TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS fit_results (
-                id TEXT PRIMARY KEY,
-                spectrum_id TEXT,
-                diagnostic TEXT NOT NULL,
-                result_json TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS exports (
-                id TEXT PRIMARY KEY,
-                path TEXT NOT NULL,
-                kind TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            )
-            """
-        )
+    get_current_store().initialize()
 
 
 def save_spectrum(spectrum: Spectrum) -> Spectrum:
-    """Persist a spectrum array as CSV and metadata/history in SQLite."""
+    """Persist a spectrum's array + metadata/history via the active store."""
 
-    initialize_storage()
-    array_path = SPECTRA_DIR / f"{spectrum.id}.csv"
-    pd.DataFrame(
-        {"wavelength_nm": spectrum.wavelength_nm, "intensity": spectrum.intensity}
-    ).to_csv(array_path, index=False)
-    now = _now()
-    with _connect() as conn:
-        conn.execute(
-            """
-            INSERT OR REPLACE INTO spectra
-            (id, filename, array_path, metadata_json, preprocessing_history_json, created_at)
-            VALUES (?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM spectra WHERE id = ?), ?))
-            """,
-            (
-                spectrum.id,
-                spectrum.filename,
-                str(array_path),
-                json.dumps(spectrum.metadata),
-                json.dumps(spectrum.preprocessing_history),
-                spectrum.id,
-                now,
-            ),
-        )
+    get_current_store().save_spectrum(spectrum)
     return spectrum
 
 
@@ -173,127 +113,34 @@ def _looks_like_binary_workbook(content: bytes) -> bool:
 
 
 def get_spectrum(spectrum_id: str) -> Spectrum:
-    """Load one spectrum by id."""
+    """Load one spectrum by id. Raises KeyError if not found."""
 
-    initialize_storage()
-    with _connect() as conn:
-        row = conn.execute("SELECT * FROM spectra WHERE id = ?", (spectrum_id,)).fetchone()
-    if row is None:
-        raise KeyError(f"spectrum not found: {spectrum_id}")
-    frame = pd.read_csv(row["array_path"])
-    return Spectrum(
-        id=row["id"],
-        filename=row["filename"],
-        wavelength_nm=frame["wavelength_nm"].to_numpy(dtype=float),
-        intensity=frame["intensity"].to_numpy(dtype=float),
-        metadata=json.loads(row["metadata_json"]),
-        preprocessing_history=json.loads(row["preprocessing_history_json"]),
-    )
+    return get_current_store().get_spectrum(spectrum_id)
 
 
 def list_spectra() -> list[dict[str, Any]]:
     """List stored spectra without loading full arrays."""
 
-    initialize_storage()
-    with _connect() as conn:
-        rows = conn.execute("SELECT * FROM spectra ORDER BY created_at DESC").fetchall()
-    summaries: list[dict[str, Any]] = []
-    for row in rows:
-        metadata = json.loads(row["metadata_json"])
-        history = json.loads(row["preprocessing_history_json"])
-        try:
-            frame = pd.read_csv(row["array_path"], usecols=["wavelength_nm"])
-            points = len(frame)
-            wl_min = float(frame["wavelength_nm"].min())
-            wl_max = float(frame["wavelength_nm"].max())
-        except Exception:
-            points = None
-            wl_min = None
-            wl_max = None
-        summaries.append(
-            {
-                "id": row["id"],
-                "filename": row["filename"],
-                "metadata": metadata,
-                "preprocessing_history": history,
-                "points": points,
-                "wavelength_min_nm": wl_min,
-                "wavelength_max_nm": wl_max,
-                "created_at": row["created_at"],
-            }
-        )
-    return summaries
+    return get_current_store().list_spectra()
 
 
 def save_fit_result(result_id: str, result: dict[str, Any]) -> None:
     """Persist a fit result JSON blob for dashboard and exports."""
 
-    initialize_storage()
-    with _connect() as conn:
-        conn.execute(
-            """
-            INSERT OR REPLACE INTO fit_results
-            (id, spectrum_id, diagnostic, result_json, created_at)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (
-                result_id,
-                result.get("spectrum_id"),
-                result.get("diagnostic", "analysis"),
-                json.dumps(result),
-                _now(),
-            ),
-        )
+    get_current_store().save_fit_result(result_id, result)
 
 
 def list_fit_results() -> list[dict[str, Any]]:
     """Return stored fit results for dashboard plotting."""
 
-    initialize_storage()
-    with _connect() as conn:
-        rows = conn.execute("SELECT result_json FROM fit_results ORDER BY created_at DESC").fetchall()
-    return [json.loads(row["result_json"]) for row in rows]
+    return get_current_store().list_fit_results()
 
 
 def save_export_record(export_id: str, path: Path, kind: str) -> None:
-    initialize_storage()
-    with _connect() as conn:
-        conn.execute(
-            "INSERT OR REPLACE INTO exports (id, path, kind, created_at) VALUES (?, ?, ?, ?)",
-            (export_id, str(path), kind, _now()),
-        )
+    get_current_store().save_export(export_id, kind, path)
 
 
-def get_export_path(export_id: str) -> Path:
-    initialize_storage()
-    with _connect() as conn:
-        row = conn.execute("SELECT path FROM exports WHERE id = ?", (export_id,)).fetchone()
-    if row is None:
-        raise KeyError(f"export not found: {export_id}")
-    return Path(row["path"])
+def get_export_bytes(export_id: str) -> tuple[bytes, str]:
+    """Return (content, filename) for a previously generated export."""
 
-
-@contextmanager
-def _connect() -> Iterator[sqlite3.Connection]:
-    # sqlite3.Connection's own context-manager protocol only commits/rolls
-    # back a transaction -- it does NOT close the connection, so `with
-    # _connect() as conn:` at every call site used to leak a connection
-    # object, relying on CPython refcounting (not a language guarantee) to
-    # eventually close it. Wrap it so every call site's `with` block still
-    # reads the same but now actually closes on exit, and set a
-    # busy_timeout so concurrent writers (e.g. a running batch plus a
-    # recipe/spectrum save) back off and retry instead of immediately
-    # raising "database is locked".
-    STORAGE_ROOT.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA busy_timeout = 5000")
-    try:
-        with conn:
-            yield conn
-    finally:
-        conn.close()
-
-
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return get_current_store().get_export_bytes(export_id)

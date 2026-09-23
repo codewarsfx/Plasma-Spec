@@ -67,12 +67,30 @@ PLASMA_SPEC_WINDOWS_DOWNLOAD_URL=https://example.com/PlasmaSpec-Studio-Setup.exe
 
 Build the Windows installer on Windows, not by cross-building from macOS. The Windows app needs a PyInstaller-built `plasma-spec-backend.exe` sidecar; a macOS cross-build can package the wrong backend binary.
 
+## Google Sign-In / Supabase in Desktop Builds
+
+Set these before `npm run desktop:prepare` (or `dist:mac`/`dist:win`, which call it) if you want the packaged app to have Google sign-in and Supabase-backed persistence baked in, same as the web app's `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY`:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-public-key
+```
+
+`scripts/desktop/build-frontend.mjs` bakes these into the renderer's Next bundle (as usual for `NEXT_PUBLIC_*`) and also writes `desktop/env.generated.cjs` (gitignored, regenerated every build) so `desktop/main.cjs`'s own Google sign-in flow -- which runs in the Electron main process, not through Next's webpack build -- has them too, without requiring an end user to set environment variables to launch the app. Without them, the packaged app still works, just with local-only storage and no sign-in button (same as running the web app with no Supabase env vars).
+
+The Python backend sidecar separately needs `PLASMA_SPEC_STORAGE_BACKEND=supabase` + `SUPABASE_URL`/`SUPABASE_ANON_KEY` in its own environment to turn on Supabase mode (`startBackend()` already forwards `desktop/main.cjs`'s entire `process.env` into the spawned backend, so setting these in the shell that launches the app -- `npm run desktop:dev`, or the packaged app's launch environment -- is enough; no code change needed).
+
+**`SUPABASE_JWT_SECRET` is optional and deliberately not auto-baked**: `backend/app/auth.py` verifies tokens against the project's public JWKS by default (Supabase's now-standard asymmetric ES256 signing keys), which only needs the already-public `SUPABASE_URL` -- no secret involved. `SUPABASE_JWT_SECRET` is only a fallback for a project still on (or mid-migration off of) the legacy shared HS256 secret, and unlike the anon key it's a real secret -- anyone who extracted it from a distributed binary could forge a valid access token for *any* user in the project, not just their own. It is intentionally NOT written into `env.generated.cjs` the way the URL/anon key are; set it in the launch environment directly if you still need it, same as the other two.
+
+`package.json`'s electron-builder `files` list includes `node_modules/**/*` (needed so `@supabase/supabase-js` -- a root-level `dependencies` entry, not `devDependencies` -- gets bundled into the packaged app; electron-builder's default pruning still correctly excludes `electron`/`electron-builder` themselves). Run `npm install` at the repo root (not just inside `frontend/`) after pulling this change.
+
 ## What Gets Bundled
 
 - `desktop-dist/frontend`: Next.js standalone server and static assets
 - `desktop-dist/backend`: PyInstaller backend executable
 - `desktop-dist/molecular`: MassiveOES-style SQLite molecular line databases
-- backend storage (spectra, exports, recipes) and the NIST live-refresh cache / user atomic-line overrides are created per user under the desktop app's user-data directory (`app.getPath("userData")`), not inside the read-only `.app` bundle
+- root `node_modules/@supabase/**` (see above)
+- backend storage (spectra, exports, recipes) and the NIST live-refresh cache / user atomic-line overrides are created per user under the desktop app's user-data directory (`app.getPath("userData")`), not inside the read-only `.app` bundle -- or, with `PLASMA_SPEC_STORAGE_BACKEND=supabase`, persisted to Supabase instead
 
 `npm run desktop:build:backend` looks for the molecular `.db` files in a sibling `Molecular Line Data/` folder next to this repo (gitignored -- it's real lab data, not tracked in git). **The build now fails loudly if it can't find them**, since a "successful" build without them ships with molecular band fitting completely broken. If you're intentionally building a demo-only package, set `PLASMA_SPEC_ALLOW_MISSING_MOLECULAR_DB=1` to acknowledge that and continue anyway. `.github/workflows/desktop-release.yml` only checks out this repo, so CI has no access to that data either -- until it's provided as a secret/private artifact step in that workflow, CI desktop builds will fail this check rather than silently ship broken installers.
 

@@ -2,20 +2,22 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse
+import mimetypes
 
+from fastapi import APIRouter, Depends, HTTPException, Response
+
+from app.auth import AuthedUser, authenticated
 from app.schemas.fitting_schema import ExportResultRequest, ReportRequest
 from app.services.export_service import export_fit_plot_png, export_result_csv, export_result_json
 from app.services.report_service import export_report_html, export_report_pdf
-from app.services.spectrum_service import get_export_path, list_fit_results
+from app.services.spectrum_service import get_export_bytes, list_fit_results
 
 
 router = APIRouter(prefix="/api", tags=["exports"])
 
 
 @router.post("/exports/result")
-def export_result(request: ExportResultRequest) -> dict:
+def export_result(request: ExportResultRequest, user: AuthedUser = Depends(authenticated)) -> dict:
     exports = {}
     try:
         if "json" in request.formats:
@@ -30,7 +32,7 @@ def export_result(request: ExportResultRequest) -> dict:
 
 
 @router.post("/reports/result")
-def export_report(request: ReportRequest) -> dict:
+def export_report(request: ReportRequest, user: AuthedUser = Depends(authenticated)) -> dict:
     """Render a per-result HTML and/or PDF report and return download links."""
 
     exports = {}
@@ -47,15 +49,20 @@ def export_report(request: ReportRequest) -> dict:
 
 
 @router.get("/exports/{export_id}")
-def download_export(export_id: str) -> FileResponse:
+def download_export(export_id: str, user: AuthedUser = Depends(authenticated)) -> Response:
     try:
-        path = get_export_path(export_id)
+        content, filename = get_export_bytes(export_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return FileResponse(path, filename=path.name)
+    content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    return Response(
+        content=content,
+        media_type=content_type,
+        headers={"content-disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/results")
-def results_for_dashboard() -> list[dict]:
+def results_for_dashboard(user: AuthedUser = Depends(authenticated)) -> list[dict]:
     return list_fit_results()
 

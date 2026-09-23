@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import json
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
+from app.auth import AuthedUser, authenticated
 from app.schemas.fitting_schema import BatchRunRequest
 from app.services.batch_manager import get_batch, list_batches, start_batch, subscribe, unsubscribe
 from app.services.batch_service import run_batch
@@ -17,7 +18,7 @@ router = APIRouter(prefix="/api/batch", tags=["batch"])
 
 
 @router.post("/run")
-def run_batch_route(request: BatchRunRequest) -> dict:
+def run_batch_route(request: BatchRunRequest, user: AuthedUser = Depends(authenticated)) -> dict:
     """Run a batch synchronously and return the full envelope.
 
     Kept for back-compat with the original frontend. For long molecular runs,
@@ -32,7 +33,7 @@ def run_batch_route(request: BatchRunRequest) -> dict:
 
 
 @router.post("/start")
-async def start_batch_route(request: BatchRunRequest) -> dict:
+async def start_batch_route(request: BatchRunRequest, user: AuthedUser = Depends(authenticated)) -> dict:
     """Start a batch in the background and return its identifier.
 
     Open ``/api/batch/{batch_id}/stream`` (SSE) for per-spectrum progress
@@ -52,7 +53,7 @@ async def start_batch_route(request: BatchRunRequest) -> dict:
 
 
 @router.get("/{batch_id}/stream")
-async def batch_stream_route(batch_id: str) -> StreamingResponse:
+async def batch_stream_route(batch_id: str, user: AuthedUser = Depends(authenticated)) -> StreamingResponse:
     """Server-Sent Events stream of per-spectrum progress events."""
 
     try:
@@ -82,7 +83,7 @@ async def batch_stream_route(batch_id: str) -> StreamingResponse:
 
 
 @router.get("/{batch_id}/result")
-def batch_result_route(batch_id: str) -> dict:
+def batch_result_route(batch_id: str, user: AuthedUser = Depends(authenticated)) -> dict:
     try:
         state = get_batch(batch_id)
     except KeyError as exc:
@@ -104,6 +105,6 @@ def batch_result_route(batch_id: str) -> dict:
 
 
 @router.get("")
-def list_batches_route() -> dict:
+def list_batches_route(user: AuthedUser = Depends(authenticated)) -> dict:
     return {"batches": list_batches()}
 

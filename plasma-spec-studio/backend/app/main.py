@@ -4,6 +4,14 @@ from __future__ import annotations
 
 import os
 
+from dotenv import load_dotenv
+
+# Must run before any app.* import that reads os.environ at module load time
+# (app.auth reads SUPABASE_*/PLASMA_SPEC_STORAGE_BACKEND as module-level
+# constants). No-op if backend/.env doesn't exist -- env vars exported in
+# the shell (or passed by desktop/main.cjs) still work as before.
+load_dotenv()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 

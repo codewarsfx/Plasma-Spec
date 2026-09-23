@@ -1,8 +1,9 @@
-const { app, BrowserWindow, dialog, shell } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
 const childProcess = require("child_process");
 const fs = require("fs");
 const http = require("http");
 const path = require("path");
+const { createClient } = require("@supabase/supabase-js");
 
 const BACKEND_PORT = Number(process.env.PLASMA_SPEC_BACKEND_PORT || 18765);
 const FRONTEND_PORT = Number(process.env.PLASMA_SPEC_FRONTEND_PORT || 18766);
@@ -11,6 +12,20 @@ const HOST = "127.0.0.1";
 let backendProcess = null;
 let frontendProcess = null;
 let mainWindow = null;
+
+// scripts/desktop/build-frontend.mjs writes this from NEXT_PUBLIC_SUPABASE_*
+// at package time (same values the renderer's Next bundle gets baked in
+// with) so the packaged app has them without requiring an end user to set
+// environment variables. `npm run desktop:dev` has no generated file, so it
+// falls back to whatever the developer's own shell already exports.
+let generatedEnv = {};
+try {
+  generatedEnv = require("./env.generated.cjs");
+} catch {
+  // Expected outside a packaged build.
+}
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || generatedEnv.SUPABASE_URL || "";
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || generatedEnv.SUPABASE_ANON_KEY || "";
 
 function resourcePath(...parts) {
   if (app.isPackaged) {
@@ -36,6 +51,147 @@ function studioUrl() {
   }
   return `http://${HOST}:${FRONTEND_PORT}/studio`;
 }
+
+// --- Desktop Google sign-in ---------------------------------------------
+//
+// Google refuses to complete OAuth inside an embedded/webview-style browser
+// (which Electron's BrowserWindow is treated as), so sign-in has to happen
+// in the user's real system browser, with the result routed back into the
+// app via a temporary loopback HTTP server:
+//   1. Ask Supabase for the Google authorize URL (skipBrowserRedirect,
+//      since there's no window to redirect in this Node process).
+//   2. Open it in the system browser (shell.openExternal).
+//   3. A loopback server on an OS-assigned ephemeral port catches Google's
+//      redirect back with ?code=...
+//   4. Exchange the code for a session using the SAME client instance that
+//      started the flow (PKCE requires this -- the code_verifier lives in
+//      that client's in-memory storage).
+//   5. Send the session to the renderer over IPC; its own Supabase client
+//      adopts it via setSession() and takes over from there (persisted,
+//      auto-refreshing), exactly like the web sign-in flow.
+
+let authClient = null;
+
+function getAuthClient() {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return null;
+  if (!authClient) {
+    // No localStorage in a Node/main-process context -- use an explicit
+    // in-memory adapter instead of relying on supabase-js's own
+    // browser-vs-server auto-detection. This client only exists to run the
+    // PKCE dance once per sign-in attempt; the real, persisted session
+    // lives in the renderer's cookie-backed client (lib/supabase/client.ts).
+    const memory = new Map();
+    authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        storage: {
+          getItem: (key) => (memory.has(key) ? memory.get(key) : null),
+          setItem: (key, value) => memory.set(key, value),
+          removeItem: (key) => memory.delete(key),
+        },
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    });
+  }
+  return authClient;
+}
+
+let loopbackServer = null;
+
+function stopLoopbackServer() {
+  if (loopbackServer) {
+    loopbackServer.close();
+    loopbackServer = null;
+  }
+}
+
+function signInWithGoogleLoopback() {
+  const client = getAuthClient();
+  if (!client) {
+    return Promise.reject(
+      new Error("Supabase isn't configured for this build (SUPABASE_URL/SUPABASE_ANON_KEY missing)."),
+    );
+  }
+  stopLoopbackServer(); // in case a previous attempt is still hanging open
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      stopLoopbackServer();
+      fn(value);
+    };
+
+    loopbackServer = http.createServer((req, res) => {
+      const requestUrl = new URL(req.url, "http://127.0.0.1");
+      if (requestUrl.pathname !== "/callback") {
+        res.writeHead(404);
+        res.end();
+        return;
+      }
+      const code = requestUrl.searchParams.get("code");
+      const errorDescription =
+        requestUrl.searchParams.get("error_description") || requestUrl.searchParams.get("error");
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.end("<html><body>Signed in. You can close this tab and return to PlasmaSpec Studio.</body></html>");
+
+      if (errorDescription) {
+        finish(reject, new Error(errorDescription));
+        return;
+      }
+      if (!code) {
+        finish(reject, new Error("Google sign-in did not return an authorization code."));
+        return;
+      }
+      client.auth
+        .exchangeCodeForSession(code)
+        .then(({ data, error }) => {
+          if (error) throw error;
+          finish(resolve, data.session);
+        })
+        .catch((error) => finish(reject, error));
+    });
+
+    loopbackServer.on("error", (error) => finish(reject, error));
+
+    loopbackServer.listen(0, "127.0.0.1", () => {
+      const { port } = loopbackServer.address();
+      client.auth
+        .signInWithOAuth({
+          provider: "google",
+          options: { redirectTo: `http://127.0.0.1:${port}/callback`, skipBrowserRedirect: true },
+        })
+        .then(({ data, error }) => {
+          if (error || !data.url) {
+            throw error || new Error("Failed to build the Google sign-in URL.");
+          }
+          shell.openExternal(data.url);
+        })
+        .catch((error) => finish(reject, error));
+    });
+
+    // Give up if nobody completes sign-in in the browser within 5 minutes.
+    setTimeout(() => finish(reject, new Error("Sign-in timed out.")), 5 * 60 * 1000);
+  });
+}
+
+ipcMain.handle("auth:sign-in", async (event) => {
+  try {
+    const session = await signInWithGoogleLoopback();
+    event.sender.send("auth:session", session);
+  } catch (error) {
+    dialog.showErrorBox("Sign-in failed", error instanceof Error ? error.message : String(error));
+  }
+});
+
+ipcMain.handle("auth:sign-out", async () => {
+  // The renderer's own client already signed itself out (AuthButton.tsx);
+  // this just resets our ephemeral PKCE helper so the next sign-in starts
+  // from a clean state.
+  authClient = null;
+});
 
 function appDataPath(...parts) {
   return path.join(app.getPath("userData"), ...parts);
@@ -146,6 +302,7 @@ async function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      preload: path.join(__dirname, "preload.cjs"),
     },
   });
 

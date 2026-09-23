@@ -26,7 +26,8 @@
     "afterSign": "scripts/desktop/notarize.cjs",
     "files": [
       "desktop/**/*",
-      "package.json"
+      "package.json",
+      "node_modules/**/*"
     ],
     "extraResources": [
       {
@@ -79,6 +80,9 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
     }
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0"
   },
   "devDependencies": {
     "electron": "^33.4.11",

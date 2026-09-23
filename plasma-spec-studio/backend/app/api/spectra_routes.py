@@ -5,8 +5,9 @@ from __future__ import annotations
 import json
 from typing import Annotated
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
+from app.auth import AuthedUser, authenticated
 from app.preprocessing.importers import load_metadata_csv
 from app.schemas.spectrum_schema import SpectrumResponse, SpectrumSummary
 from app.services.spectrum_service import get_spectrum, list_spectra, save_uploaded_spectrum
@@ -23,6 +24,7 @@ async def upload_spectra(
     intensity_column: Annotated[str | None, Form()] = None,
     filename_pattern: Annotated[str | None, Form()] = None,
     parse_filename_metadata: Annotated[bool, Form()] = True,
+    user: AuthedUser = Depends(authenticated),
 ) -> list[dict]:
     """Upload one or more spectra.
 
@@ -52,12 +54,12 @@ async def upload_spectra(
 
 
 @router.get("", response_model=list[SpectrumSummary])
-def list_spectrum_records() -> list[dict]:
+def list_spectrum_records(user: AuthedUser = Depends(authenticated)) -> list[dict]:
     return list_spectra()
 
 
 @router.get("/{spectrum_id}", response_model=SpectrumResponse)
-def read_spectrum(spectrum_id: str) -> dict:
+def read_spectrum(spectrum_id: str, user: AuthedUser = Depends(authenticated)) -> dict:
     try:
         return get_spectrum(spectrum_id).to_dict(include_arrays=True)
     except KeyError as exc:
