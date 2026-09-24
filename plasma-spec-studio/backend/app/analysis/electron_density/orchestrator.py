@@ -244,6 +244,23 @@ def compute_electron_density(
         "voigt_total_fwhm_nm": float(total_fwhm),
     }
 
+    # The fit itself runs on peak-normalized intensity (0-1; see
+    # _prepare_halpha_data), so data_curve/fit_curve/residual_curve out of
+    # voigt_fits are in that normalized scale. The UI overlays these curves on
+    # the raw (un-normalized) primary spectrum trace, so rescale back to raw
+    # intensity units here or the fit line would render as a near-flat line
+    # next to the much taller raw peak, even for a genuinely good fit.
+    raw_min = fit_result["raw_intensity_min"]
+    raw_max = fit_result["raw_intensity_max"]
+    raw_scale = raw_max - raw_min
+
+    def _rescale(curve: list[dict[str, float]], *, is_delta: bool = False) -> list[dict[str, float]]:
+        offset = 0.0 if is_delta else raw_min
+        return [
+            {"wavelength_nm": point["wavelength_nm"], "value": point["value"] * raw_scale + offset}
+            for point in curve
+        ]
+
     return {
         "spectrum_id": spectrum.id,
         "filename": spectrum.filename,
@@ -263,9 +280,9 @@ def compute_electron_density(
         "electron_density": electron_density,
         "warnings": warnings,
         "preprocessing_history": spectrum.preprocessing_history,
-        "measured_curve": fit_result["data_curve"],
-        "fit_curve": fit_result["fit_curve"],
-        "residual_curve": fit_result["residual_curve"],
+        "measured_curve": _rescale(fit_result["data_curve"]),
+        "fit_curve": _rescale(fit_result["fit_curve"]),
+        "residual_curve": _rescale(fit_result["residual_curve"], is_delta=True),
         "fit_quality": _classify_quality(fit_result["fit_metrics"], warnings),
         "metrics": fit_result["fit_metrics"],
         "parameters": {
