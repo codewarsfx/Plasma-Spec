@@ -78,6 +78,17 @@ class SupabaseStore(Store):
             )
         return response.content
 
+    def _storage_delete(self, bucket: str, path: str) -> None:
+        url = f"{self._storage_base}/object/{bucket}/{path}"
+        response = httpx.delete(url, headers=self._storage_headers, timeout=60.0)
+        # 404 is fine here -- the row pointing at it is what we're actually
+        # deleting; a missing object shouldn't block that.
+        if response.status_code >= 300 and response.status_code != 404:
+            raise RuntimeError(
+                f"Supabase Storage delete of {bucket}/{path} failed "
+                f"({response.status_code}): {response.text}"
+            )
+
     def _spectrum_storage_path(self, spectrum_id: str) -> str:
         return f"{self.user_id}/{spectrum_id}.csv"
 
@@ -158,6 +169,27 @@ class SupabaseStore(Store):
             }
             for row in result.data
         ]
+
+    def delete_spectrum(self, spectrum_id: str) -> None:
+        result = (
+            self.client.table("spectra")
+            .select("storage_path")
+            .eq("id", spectrum_id)
+            .eq("user_id", self.user_id)
+            .limit(1)
+            .execute()
+        )
+        if not result.data:
+            raise KeyError(f"spectrum not found: {spectrum_id}")
+        storage_path = result.data[0]["storage_path"]
+        # fit_results.spectrum_id is ON DELETE SET NULL at the DB level
+        # (orphans, doesn't remove them), so cascade explicitly here to
+        # actually delete the associated data as requested.
+        self.client.table("fit_results").delete().eq("spectrum_id", spectrum_id).eq(
+            "user_id", self.user_id
+        ).execute()
+        self.client.table("spectra").delete().eq("id", spectrum_id).eq("user_id", self.user_id).execute()
+        self._storage_delete(SPECTRA_BUCKET, storage_path)
 
     # -- Recipes ----------------------------------------------------------
     def save_recipe(self, recipe: dict[str, Any]) -> dict[str, Any]:

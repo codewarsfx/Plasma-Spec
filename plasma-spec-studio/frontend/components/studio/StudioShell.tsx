@@ -181,6 +181,26 @@ export function StudioShell() {
     });
   }
 
+  function handleSpectrumDeleted(id: string) {
+    setLoadedSpectra((current) => {
+      if (!(id in current)) return current;
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+    setOverlayIds((current) => {
+      if (!current.has(id)) return current;
+      const next = new Set(current);
+      next.delete(id);
+      return next;
+    });
+    if (selectedId === id) {
+      setSelectedId(undefined);
+      setLastResult(null);
+      setLastResultKind(null);
+    }
+  }
+
   function handleSelectRegion(range: [number, number]) {
     setWindowNm(range);
   }
@@ -237,6 +257,7 @@ export function StudioShell() {
           overlayIds={overlayIds}
           onSelectSpectrum={handleSelectSpectrum}
           onToggleOverlay={handleToggleOverlay}
+          onSpectrumDeleted={handleSpectrumDeleted}
         />
       </div>
 

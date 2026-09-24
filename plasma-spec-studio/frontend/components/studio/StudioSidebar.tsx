@@ -9,10 +9,11 @@ import {
   Loader2,
   RefreshCw,
   Search,
+  Trash2,
   Upload,
 } from "lucide-react";
-import { ChangeEvent, useEffect, useMemo, useState } from "react";
-import { listSpectra, uploadSpectra } from "@/lib/api";
+import { ChangeEvent, MouseEvent, useEffect, useMemo, useState } from "react";
+import { deleteSpectrum, listSpectra, uploadSpectra } from "@/lib/api";
 import { toast } from "@/components/Toast";
 import type { SpectrumSummary } from "@/lib/types";
 
@@ -42,6 +43,7 @@ type StudioSidebarProps = {
   overlayIds: Set<string>;
   onSelectSpectrum: (id: string) => void;
   onToggleOverlay: (id: string) => void;
+  onSpectrumDeleted?: (id: string) => void;
 };
 
 export function StudioSidebar({
@@ -51,12 +53,14 @@ export function StudioSidebar({
   overlayIds,
   onSelectSpectrum,
   onToggleOverlay,
+  onSpectrumDeleted,
 }: StudioSidebarProps) {
   const [search, setSearch] = useState("");
   const [groupKey, setGroupKey] = useState<GroupKey>("pulse_frequency_khz");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [uploadBusy, setUploadBusy] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   async function refresh() {
     try {
@@ -91,6 +95,24 @@ export function StudioSidebar({
       toast.error("Upload failed", message);
     } finally {
       setUploadBusy(false);
+    }
+  }
+
+  async function handleDelete(spectrum: SpectrumSummary, event: MouseEvent) {
+    event.stopPropagation();
+    if (!window.confirm(`Delete "${spectrum.filename}"? This also deletes any fit results for it. This can't be undone.`)) {
+      return;
+    }
+    setDeletingId(spectrum.id);
+    try {
+      await deleteSpectrum(spectrum.id);
+      onSpectraChange(spectra.filter((item) => item.id !== spectrum.id));
+      onSpectrumDeleted?.(spectrum.id);
+      toast.success("Deleted", spectrum.filename);
+    } catch (exc) {
+      toast.error("Delete failed", exc instanceof Error ? exc.message : "unknown error");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -246,6 +268,18 @@ export function StudioSidebar({
                             }}
                           >
                             {isOverlay ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                          </button>
+                          <button
+                            className="flex h-6 w-6 items-center justify-center text-slate-400 transition hover:text-red-900"
+                            title="Delete spectrum"
+                            disabled={deletingId === spectrum.id}
+                            onClick={(event) => handleDelete(spectrum, event)}
+                          >
+                            {deletingId === spectrum.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-3.5 w-3.5" />
+                            )}
                           </button>
                         </li>
                       );

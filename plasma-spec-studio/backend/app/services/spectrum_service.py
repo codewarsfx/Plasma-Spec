@@ -35,6 +35,7 @@ __all__ = [
     "save_uploaded_spectrum",
     "get_spectrum",
     "list_spectra",
+    "delete_spectrum",
     "save_fit_result",
     "list_fit_results",
     "save_export_record",
@@ -122,6 +123,13 @@ def list_spectra() -> list[dict[str, Any]]:
     """List stored spectra without loading full arrays."""
 
     return get_current_store().list_spectra()
+
+
+def delete_spectrum(spectrum_id: str) -> None:
+    """Delete a spectrum and its associated fit results. Raises KeyError if
+    not found."""
+
+    get_current_store().delete_spectrum(spectrum_id)
 
 
 def save_fit_result(result_id: str, result: dict[str, Any]) -> None:

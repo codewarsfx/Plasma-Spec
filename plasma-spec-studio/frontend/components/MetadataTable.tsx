@@ -1,14 +1,37 @@
 "use client";
 
+import { Loader2, Trash2 } from "lucide-react";
+import { MouseEvent, useState } from "react";
+import { deleteSpectrum } from "@/lib/api";
+import { toast } from "@/components/Toast";
 import type { SpectrumSummary } from "@/lib/types";
 
 type MetadataTableProps = {
   spectra: SpectrumSummary[];
   selectedId?: string;
   onSelect?: (id: string) => void;
+  onDeleted?: (id: string) => void;
 };
 
-export function MetadataTable({ spectra, selectedId, onSelect }: MetadataTableProps) {
+export function MetadataTable({ spectra, selectedId, onSelect, onDeleted }: MetadataTableProps) {
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  async function handleDelete(spectrum: SpectrumSummary, event: MouseEvent) {
+    event.stopPropagation();
+    if (!window.confirm(`Delete "${spectrum.filename}"? This also deletes any fit results for it. This can't be undone.`)) {
+      return;
+    }
+    setDeletingId(spectrum.id);
+    try {
+      await deleteSpectrum(spectrum.id);
+      onDeleted?.(spectrum.id);
+      toast.success("Deleted", spectrum.filename);
+    } catch (exc) {
+      toast.error("Delete failed", exc instanceof Error ? exc.message : "unknown error");
+    } finally {
+      setDeletingId(null);
+    }
+  }
   return (
     <div className="panel overflow-hidden">
       <div className="border-b border-line px-4 py-3">
@@ -23,6 +46,7 @@ export function MetadataTable({ spectra, selectedId, onSelect }: MetadataTablePr
               <th className="border-b border-line px-3 py-2">Gas</th>
               <th className="border-b border-line px-3 py-2">Pulse</th>
               <th className="border-b border-line px-3 py-2">N</th>
+              <th className="border-b border-line px-3 py-2"></th>
             </tr>
           </thead>
           <tbody>
@@ -45,11 +69,25 @@ export function MetadataTable({ spectra, selectedId, onSelect }: MetadataTablePr
                 <td className="border-b border-line px-3 py-2 text-slate-600">
                   {spectrum.metadata?.n_cycles ?? ""}
                 </td>
+                <td className="border-b border-line px-3 py-2 text-right">
+                  <button
+                    className="inline-flex h-6 w-6 items-center justify-center text-slate-400 transition hover:text-red-900"
+                    title="Delete spectrum"
+                    disabled={deletingId === spectrum.id}
+                    onClick={(event) => handleDelete(spectrum, event)}
+                  >
+                    {deletingId === spectrum.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                </td>
               </tr>
             ))}
             {spectra.length === 0 ? (
               <tr>
-                <td className="px-3 py-8 text-center text-sm text-slate-500" colSpan={5}>
+                <td className="px-3 py-8 text-center text-sm text-slate-500" colSpan={6}>
                   No spectra loaded
                 </td>
               </tr>

@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from app.auth import AuthedUser, authenticated
 from app.preprocessing.importers import load_metadata_csv
 from app.schemas.spectrum_schema import SpectrumResponse, SpectrumSummary
-from app.services.spectrum_service import get_spectrum, list_spectra, save_uploaded_spectrum
+from app.services.spectrum_service import delete_spectrum, get_spectrum, list_spectra, save_uploaded_spectrum
 
 
 router = APIRouter(prefix="/api/spectra", tags=["spectra"])
@@ -64,6 +64,18 @@ def read_spectrum(spectrum_id: str, user: AuthedUser = Depends(authenticated)) -
         return get_spectrum(spectrum_id).to_dict(include_arrays=True)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.delete("/{spectrum_id}")
+def delete_spectrum_route(spectrum_id: str, user: AuthedUser = Depends(authenticated)) -> dict:
+    """Delete a spectrum, its stored array, and any fit results that
+    reference it."""
+
+    try:
+        delete_spectrum(spectrum_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"deleted": spectrum_id}
 
 
 def _parse_column_override(value: str | None) -> str | int | None:

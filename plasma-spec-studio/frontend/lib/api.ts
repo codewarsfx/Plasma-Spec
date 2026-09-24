@@ -65,6 +65,10 @@ export function getSpectrum(id: string) {
   return request<Spectrum>(`/api/spectra/${id}`);
 }
 
+export function deleteSpectrum(id: string) {
+  return request<{ deleted: string }>(`/api/spectra/${id}`, { method: "DELETE" });
+}
+
 export function preprocessSpectrum(
   spectrumId: string,
   operations: PreprocessingOperation[],

@@ -164,7 +164,7 @@ export function StudioResultsTable({ result, kind }: StudioResultsTableProps) {
                 {columns.map((col) => (
                   <th
                     key={col}
-                    className="border-b border-line px-2 py-1.5 text-[11px] uppercase tracking-normal text-slate-600"
+                    className="whitespace-nowrap border-b border-line px-2 py-1.5 text-[11px] uppercase tracking-normal text-slate-600"
                   >
                     {col}
                   </th>
@@ -175,7 +175,7 @@ export function StudioResultsTable({ result, kind }: StudioResultsTableProps) {
               {rows.map((row, index) => (
                 <tr key={index} className="odd:bg-white even:bg-slate-50">
                   {columns.map((col) => (
-                    <td key={col} className="border-b border-line px-2 py-1.5 tabular-nums">
+                    <td key={col} className="whitespace-nowrap border-b border-line px-2 py-1.5 tabular-nums">
                       {formatCell(row[col])}
                     </td>
                   ))}

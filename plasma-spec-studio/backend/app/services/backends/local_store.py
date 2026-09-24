@@ -181,6 +181,19 @@ class LocalStore(Store):
             )
         return summaries
 
+    def delete_spectrum(self, spectrum_id: str) -> None:
+        self.initialize()
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT array_path FROM spectra WHERE id = ?", (spectrum_id,)
+            ).fetchone()
+            if row is None:
+                raise KeyError(f"spectrum not found: {spectrum_id}")
+            conn.execute("DELETE FROM fit_results WHERE spectrum_id = ?", (spectrum_id,))
+            conn.execute("DELETE FROM spectra WHERE id = ?", (spectrum_id,))
+        array_path = Path(row["array_path"])
+        array_path.unlink(missing_ok=True)
+
     # -- Recipes ----------------------------------------------------------
     def save_recipe(self, recipe: dict[str, Any]) -> dict[str, Any]:
         self.initialize()

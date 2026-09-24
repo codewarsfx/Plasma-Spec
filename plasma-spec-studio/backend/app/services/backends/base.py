@@ -59,6 +59,12 @@ class Store(ABC):
     def list_spectra(self) -> list[dict[str, Any]]:
         """Summaries (no full arrays) for the spectra list UI."""
 
+    @abstractmethod
+    def delete_spectrum(self, spectrum_id: str) -> None:
+        """Delete the spectrum's row/array plus any fit_results that
+        reference it (cascade) -- exports are left alone, since they aren't
+        traceable back to a source spectrum_id in the schema."""
+
     # -- Recipes ----------------------------------------------------------
     @abstractmethod
     def save_recipe(self, recipe: dict[str, Any]) -> dict[str, Any]: ...

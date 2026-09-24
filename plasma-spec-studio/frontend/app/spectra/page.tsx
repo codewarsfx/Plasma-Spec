@@ -71,7 +71,26 @@ export default function SpectraPage() {
           {error ? <p className="text-sm text-red-700">{error}</p> : null}
         </div>
         <div className="grid gap-4">
-          <MetadataTable spectra={spectra} selectedId={Array.from(selectedIds)[0]} onSelect={selectSpectrum} />
+          <MetadataTable
+            spectra={spectra}
+            selectedId={Array.from(selectedIds)[0]}
+            onSelect={selectSpectrum}
+            onDeleted={(id) => {
+              setSpectra((current) => current.filter((item) => item.id !== id));
+              setSelectedIds((current) => {
+                if (!current.has(id)) return current;
+                const next = new Set(current);
+                next.delete(id);
+                return next;
+              });
+              setLoaded((current) => {
+                if (!(id in current)) return current;
+                const next = { ...current };
+                delete next[id];
+                return next;
+              });
+            }}
+          />
           <div className="flex items-center gap-2 text-sm text-slate-600">
             <Eye className="h-4 w-4" />
             {selectedIds.size} overlay{selectedIds.size === 1 ? "" : "s"} selected
