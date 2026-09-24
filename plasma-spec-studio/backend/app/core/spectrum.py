@@ -9,6 +9,8 @@ from uuid import uuid4
 
 import numpy as np
 
+from app.core.json_safe import json_safe
+
 
 @dataclass(slots=True)
 class Spectrum:
@@ -65,8 +67,8 @@ class Spectrum:
         data: dict[str, Any] = {
             "id": self.id,
             "filename": self.filename,
-            "metadata": self.metadata,
-            "preprocessing_history": self.preprocessing_history,
+            "metadata": json_safe(self.metadata),
+            "preprocessing_history": json_safe(self.preprocessing_history),
         }
         if include_arrays:
             data["wavelength_nm"] = self.wavelength_nm.tolist()

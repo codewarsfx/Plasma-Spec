@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 // Pages that need a signed-in user. Everything else (the landing page,
 // /login, /auth/callback, /downloads/*) stays public.
-const PROTECTED_PREFIXES = ["/studio", "/spectra", "/batch", "/recipes", "/dashboard"];
+const PROTECTED_PREFIXES = ["/studio", "/spectra", "/batch", "/recipes", "/dashboard", "/activity", "/profile"];
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });

@@ -19,6 +19,7 @@ from typing import Any, Iterator
 
 import pandas as pd
 
+from app.core.json_safe import json_safe
 from app.core.spectrum import Spectrum
 from app.services.backends.base import Store
 
@@ -82,6 +83,30 @@ class LocalStore(Store):
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS profile (
+                    id TEXT PRIMARY KEY,
+                    display_name TEXT,
+                    avatar_path TEXT,
+                    avatar_content_type TEXT
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS shared_results (
+                    id TEXT PRIMARY KEY,
+                    display_name TEXT,
+                    avatar_url TEXT,
+                    spectrum_filename TEXT,
+                    diagnostic TEXT NOT NULL,
+                    caption TEXT,
+                    result_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+                """
+            )
 
     # -- Spectra --------------------------------------------------------
     def save_spectrum(self, spectrum: Spectrum) -> None:
@@ -102,8 +127,8 @@ class LocalStore(Store):
                     spectrum.id,
                     spectrum.filename,
                     str(array_path),
-                    json.dumps(spectrum.metadata),
-                    json.dumps(spectrum.preprocessing_history),
+                    json.dumps(json_safe(spectrum.metadata)),
+                    json.dumps(json_safe(spectrum.preprocessing_history)),
                     spectrum.id,
                     now,
                 ),
@@ -179,7 +204,7 @@ class LocalStore(Store):
                     recipe_id,
                     recipe.get("name", "Untitled recipe"),
                     recipe.get("diagnostic", "analysis"),
-                    json.dumps(recipe),
+                    json.dumps(json_safe(recipe)),
                     created_at,
                     now,
                 ),
@@ -219,7 +244,7 @@ class LocalStore(Store):
                     result_id,
                     result.get("spectrum_id"),
                     result.get("diagnostic", "analysis"),
-                    json.dumps(result),
+                    json.dumps(json_safe(result)),
                     _now(),
                 ),
             )
@@ -247,6 +272,123 @@ class LocalStore(Store):
             raise KeyError(f"export not found: {export_id}")
         path = Path(row["path"])
         return path.read_bytes(), path.name
+
+    # -- Profile ----------------------------------------------------------
+    _LOCAL_PROFILE_ID = "local"
+
+    def get_profile(self) -> dict[str, Any]:
+        self.initialize()
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT display_name, avatar_path FROM profile WHERE id = ?", (self._LOCAL_PROFILE_ID,)
+            ).fetchone()
+        return {
+            "id": self._LOCAL_PROFILE_ID,
+            "email": None,
+            "display_name": row["display_name"] if row else None,
+            "avatar_url": "/api/profile/avatar" if row and row["avatar_path"] else None,
+        }
+
+    def update_profile(self, display_name: str | None) -> dict[str, Any]:
+        self.initialize()
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO profile (id, display_name) VALUES (?, ?)
+                ON CONFLICT(id) DO UPDATE SET display_name = excluded.display_name
+                """,
+                (self._LOCAL_PROFILE_ID, display_name),
+            )
+        return self.get_profile()
+
+    def save_avatar(self, content: bytes, content_type: str) -> str:
+        self.initialize()
+        extension = (content_type.split("/")[-1] or "png").split("+")[0]
+        avatar_path = STORAGE_ROOT / f"avatar.{extension}"
+        avatar_path.write_bytes(content)
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO profile (id, avatar_path, avatar_content_type) VALUES (?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET avatar_path = excluded.avatar_path,
+                    avatar_content_type = excluded.avatar_content_type
+                """,
+                (self._LOCAL_PROFILE_ID, str(avatar_path), content_type),
+            )
+        return "/api/profile/avatar"
+
+    def get_avatar_bytes(self) -> tuple[bytes, str]:
+        self.initialize()
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT avatar_path, avatar_content_type FROM profile WHERE id = ?",
+                (self._LOCAL_PROFILE_ID,),
+            ).fetchone()
+        if row is None or not row["avatar_path"]:
+            raise KeyError("no avatar set")
+        return Path(row["avatar_path"]).read_bytes(), row["avatar_content_type"] or "image/png"
+
+    # -- Sharing (activity feed) --------------------------------------------
+    def share_result(self, result: dict[str, Any], caption: str | None) -> dict[str, Any]:
+        self.initialize()
+        from uuid import uuid4
+
+        profile = self.get_profile()
+        row = {
+            "id": str(uuid4()),
+            "display_name": profile["display_name"],
+            "avatar_url": profile["avatar_url"],
+            "spectrum_filename": result.get("filename"),
+            "diagnostic": result.get("diagnostic", "analysis"),
+            "caption": caption,
+            "result_json": json_safe(result),
+            "created_at": _now(),
+        }
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO shared_results
+                (id, display_name, avatar_url, spectrum_filename, diagnostic, caption, result_json, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    row["id"],
+                    row["display_name"],
+                    row["avatar_url"],
+                    row["spectrum_filename"],
+                    row["diagnostic"],
+                    row["caption"],
+                    json.dumps(row["result_json"]),
+                    row["created_at"],
+                ),
+            )
+        return {**row, "user_id": self._LOCAL_PROFILE_ID}
+
+    def list_shared_results(self, limit: int = 50) -> list[dict[str, Any]]:
+        self.initialize()
+        with self._connect() as conn:
+            rows = conn.execute(
+                "SELECT * FROM shared_results ORDER BY created_at DESC LIMIT ?", (limit,)
+            ).fetchall()
+        return [
+            {
+                "id": row["id"],
+                "user_id": self._LOCAL_PROFILE_ID,
+                "display_name": row["display_name"],
+                "avatar_url": row["avatar_url"],
+                "spectrum_filename": row["spectrum_filename"],
+                "diagnostic": row["diagnostic"],
+                "caption": row["caption"],
+                "result_json": json.loads(row["result_json"]),
+                "created_at": row["created_at"],
+            }
+            for row in rows
+        ]
+
+    def delete_shared_result(self, share_id: str) -> None:
+        self.initialize()
+        with self._connect() as conn:
+            conn.execute("DELETE FROM shared_results WHERE id = ?", (share_id,))
 
     @contextmanager
     def _connect(self) -> Iterator[sqlite3.Connection]:

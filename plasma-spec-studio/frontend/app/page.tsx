@@ -14,6 +14,8 @@ import {
   Gauge,
   HardDrive,
   LineChart,
+  Linkedin,
+  Mail,
   Microscope,
   MonitorDown,
   ShieldCheck,
@@ -226,7 +228,7 @@ export default function ProductHomePage() {
                     <p className="mt-1 text-sm leading-6">{item.detail}</p>
                   </div>
                 </div>
-                <Link href={item.href} className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 border border-[#0066ff] bg-[#0066ff] px-4 py-2 text-sm font-semibold text-white shadow-thin transition hover:bg-[#0052cc]" style={{ borderRadius: 8 }}>
+                <Link href={item.href} className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 border border-[#ea580c] bg-[#ea580c] px-4 py-2 text-sm font-semibold text-white shadow-thin transition hover:bg-[#c2410c]" style={{ borderRadius: 8 }}>
                   <Download className="h-4 w-4" />
                   {item.cta}
                 </Link>
@@ -284,7 +286,7 @@ export default function ProductHomePage() {
           <div className="workflow-list">
             {workflow.map((step, index) => (
               <div key={step.title} className="glass-step flex gap-4 border border-white/10 bg-white/10 p-5 backdrop-blur-xl">
-                <div className="flex h-8 w-8 flex-none items-center justify-center bg-[#0066ff] text-sm font-semibold text-white" style={{ borderRadius: 8 }}>
+                <div className="flex h-8 w-8 flex-none items-center justify-center bg-[#ea580c] text-sm font-semibold text-white" style={{ borderRadius: 8 }}>
                   {index + 1}
                 </div>
                 <div>
@@ -301,13 +303,13 @@ export default function ProductHomePage() {
         <div className="mx-auto grid max-w-[1240px] gap-8 lg:grid-cols-[1fr_1fr]">
           <div className="feature-card p-6">
             <div className="mb-5 flex items-center gap-3">
-              <Database className="h-6 w-6 text-[#0066ff]" />
+              <Database className="h-6 w-6 text-[#ea580c]" />
               <h2 className="text-3xl font-semibold">Line data and provenance</h2>
             </div>
             <ul className="grid gap-3">
               {trustItems.map((item) => (
                 <li key={item} className="flex gap-3 text-sm leading-6">
-                  <ShieldCheck className="mt-0.5 h-5 w-5 flex-none text-[#0066ff]" />
+                  <ShieldCheck className="mt-0.5 h-5 w-5 flex-none text-[#ea580c]" />
                   <span>{item}</span>
                 </li>
               ))}
@@ -316,7 +318,7 @@ export default function ProductHomePage() {
 
           <div className="feature-card p-6">
             <div className="mb-5 flex items-center gap-3">
-              <BookOpen className="h-6 w-6 text-[#0066ff]" />
+              <BookOpen className="h-6 w-6 text-[#ea580c]" />
               <h2 className="text-3xl font-semibold">What researchers get</h2>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -327,7 +329,7 @@ export default function ProductHomePage() {
                 [HardDrive, "Bundled databases", "Reference data ships with the desktop app."],
               ].map(([Icon, title, body]) => (
                 <div key={String(title)} className="researcher-get-card p-4" style={{ borderRadius: 8 }}>
-                  <Icon className="mb-3 h-5 w-5 text-[#0066ff]" />
+                  <Icon className="mb-3 h-5 w-5 text-[#ea580c]" />
                   <h3 className="font-semibold">{title as string}</h3>
                   <p className="mt-2 text-sm leading-6">{body as string}</p>
                 </div>
@@ -357,6 +359,24 @@ export default function ProductHomePage() {
               <a href="#download" className="landing-secondary-button">
                 <MonitorDown className="h-5 w-5" />
                 Get desktop builds
+              </a>
+            </div>
+            <div className="mt-6 flex flex-wrap gap-5 border-t border-white/10 pt-6 text-sm text-slate-300">
+              <a
+                href="https://www.linkedin.com/in/chidera-innocent-99499211a/"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 transition hover:text-white"
+              >
+                <Linkedin className="h-4 w-4" />
+                Connect on LinkedIn
+              </a>
+              <a
+                href="mailto:chiderainnocent001@gmail.com"
+                className="inline-flex items-center gap-2 transition hover:text-white"
+              >
+                <Mail className="h-4 w-4" />
+                chiderainnocent001@gmail.com
               </a>
             </div>
           </div>

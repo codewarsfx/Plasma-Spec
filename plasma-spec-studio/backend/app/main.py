@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 
+import certifi
 from dotenv import load_dotenv
 
 # Must run before any app.* import that reads os.environ at module load time
@@ -11,6 +12,17 @@ from dotenv import load_dotenv
 # constants). No-op if backend/.env doesn't exist -- env vars exported in
 # the shell (or passed by desktop/main.cjs) still work as before.
 load_dotenv()
+
+# Some Python installs (notably python.org's macOS installer, unless its
+# bundled "Install Certificates.command" has been run) ship with no CA
+# bundle wired up for urllib's default SSL context, so any HTTPS call that
+# doesn't go through a library with its own cert handling -- e.g. PyJWT's
+# PyJWKClient, used in app.auth to verify Supabase tokens -- fails with
+# "CERTIFICATE_VERIFY_FAILED: unable to get local issuer certificate", not
+# because the token itself is invalid. Point Python's default SSL context at
+# certifi's bundle explicitly so this works regardless of the local Python
+# install's own certificate setup.
+os.environ.setdefault("SSL_CERT_FILE", certifi.where())
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,7 +33,9 @@ from app.api import (
     export_routes,
     fitting_routes,
     preprocessing_routes,
+    profile_routes,
     recipe_routes,
+    share_routes,
     spectra_routes,
 )
 from app.core.constants import SOFTWARE_NAME, SOFTWARE_VERSION
@@ -63,6 +77,8 @@ app.include_router(batch_routes.router)
 app.include_router(recipe_routes.router)
 app.include_router(export_routes.router)
 app.include_router(databases_routes.router)
+app.include_router(profile_routes.router)
+app.include_router(share_routes.router)
 
 
 @app.on_event("startup")

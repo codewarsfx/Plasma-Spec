@@ -90,6 +90,42 @@ class Store(ABC):
     def get_export_bytes(self, export_id: str) -> tuple[bytes, str]:
         """Return (content, filename). Raise KeyError if not found."""
 
+    # -- Profile ----------------------------------------------------------
+    @abstractmethod
+    def get_profile(self) -> dict[str, Any]:
+        """Return {id, email, display_name, avatar_url} for the caller."""
+
+    @abstractmethod
+    def update_profile(self, display_name: str | None) -> dict[str, Any]:
+        """Update the caller's display_name; return the updated profile."""
+
+    @abstractmethod
+    def save_avatar(self, content: bytes, content_type: str) -> str:
+        """Store an avatar image for the caller; return its avatar_url."""
+
+    @abstractmethod
+    def get_avatar_bytes(self) -> tuple[bytes, str]:
+        """Return (content, content_type) for the caller's own avatar.
+
+        Only meaningful for LocalStore (single-user, no public URL to point
+        at) -- SupabaseStore's avatar_url is already a direct public bucket
+        URL the frontend can use as-is, so this only backs the local-mode
+        GET /api/profile/avatar route. Raise KeyError if none is set.
+        """
+
+    # -- Sharing (activity feed) --------------------------------------------
+    @abstractmethod
+    def share_result(self, result: dict[str, Any], caption: str | None) -> dict[str, Any]:
+        """Snapshot the caller's profile + ``result`` into a new feed entry."""
+
+    @abstractmethod
+    def list_shared_results(self, limit: int = 50) -> list[dict[str, Any]]:
+        """Newest-first feed. Every signed-in member sees every entry."""
+
+    @abstractmethod
+    def delete_shared_result(self, share_id: str) -> None:
+        """Remove a feed entry. Callers may only delete their own."""
+
 
 _current_store: ContextVar[Store | None] = ContextVar("plasma_spec_current_store", default=None)
 _default_local_store: Store | None = None

@@ -26,17 +26,20 @@ import httpx
 import pandas as pd
 from supabase import Client, create_client
 
+from app.core.json_safe import json_safe
 from app.core.spectrum import Spectrum
 from app.services.backends.base import Store
 
 
 SPECTRA_BUCKET = "spectra"
 EXPORTS_BUCKET = "exports"
+AVATARS_BUCKET = "avatars"
 
 
 class SupabaseStore(Store):
     def __init__(self, supabase_url: str, anon_key: str, access_token: str, user_id: str) -> None:
         self.user_id = user_id
+        self._supabase_url = supabase_url.rstrip("/")
         self._storage_base = f"{supabase_url.rstrip('/')}/storage/v1"
         self._storage_headers = {
             "Authorization": f"Bearer {access_token}",
@@ -101,8 +104,8 @@ class SupabaseStore(Store):
             "user_id": self.user_id,
             "filename": spectrum.filename,
             "storage_path": storage_path,
-            "metadata": spectrum.metadata,
-            "preprocessing_history": spectrum.preprocessing_history,
+            "metadata": json_safe(spectrum.metadata),
+            "preprocessing_history": json_safe(spectrum.preprocessing_history),
             "points": int(len(wavelength)),
             "wavelength_min_nm": float(wavelength.min()) if len(wavelength) else None,
             "wavelength_max_nm": float(wavelength.max()) if len(wavelength) else None,
@@ -173,7 +176,7 @@ class SupabaseStore(Store):
             "user_id": self.user_id,
             "name": recipe.get("name", "Untitled recipe"),
             "diagnostic": recipe.get("diagnostic", "analysis"),
-            "recipe_json": recipe,
+            "recipe_json": json_safe(recipe),
             "created_at": created_at,
             "updated_at": _now(),
         }
@@ -213,7 +216,7 @@ class SupabaseStore(Store):
             "user_id": self.user_id,
             "spectrum_id": result.get("spectrum_id"),
             "diagnostic": result.get("diagnostic", "analysis"),
-            "result_json": result,
+            "result_json": json_safe(result),
             "created_at": _now(),
         }
         self.client.table("fit_results").upsert(row, on_conflict="id").execute()
@@ -257,6 +260,75 @@ class SupabaseStore(Store):
         storage_path = result.data[0]["storage_path"]
         content = self._storage_download(EXPORTS_BUCKET, storage_path)
         return content, Path(storage_path).name
+
+    # -- Profile ----------------------------------------------------------
+    def get_profile(self) -> dict[str, Any]:
+        result = (
+            self.client.table("profiles")
+            .select("id, email, display_name, avatar_url")
+            .eq("id", self.user_id)
+            .limit(1)
+            .execute()
+        )
+        if not result.data:
+            # Shouldn't happen (the signup trigger creates this row), but
+            # don't 500 the profile page over it.
+            return {"id": self.user_id, "email": None, "display_name": None, "avatar_url": None}
+        return result.data[0]
+
+    def update_profile(self, display_name: str | None) -> dict[str, Any]:
+        self.client.table("profiles").update({"display_name": display_name}).eq("id", self.user_id).execute()
+        return self.get_profile()
+
+    def _avatar_storage_path(self, extension: str) -> str:
+        return f"{self.user_id}/avatar.{extension}"
+
+    def save_avatar(self, content: bytes, content_type: str) -> str:
+        extension = (content_type.split("/")[-1] or "png").split("+")[0]
+        storage_path = self._avatar_storage_path(extension)
+        self._storage_upload(AVATARS_BUCKET, storage_path, content, content_type)
+        avatar_url = f"{self._supabase_url}/storage/v1/object/public/{AVATARS_BUCKET}/{storage_path}"
+        self.client.table("profiles").update({"avatar_url": avatar_url}).eq("id", self.user_id).execute()
+        return avatar_url
+
+    def get_avatar_bytes(self) -> tuple[bytes, str]:
+        # avatar_url from get_profile() is already a direct public Storage
+        # URL the frontend can use as-is -- this local-mode-only route
+        # should never actually be hit in Supabase mode.
+        raise KeyError("Supabase avatars are served directly from avatar_url; no local file to stream")
+
+    # -- Sharing (activity feed) --------------------------------------------
+    def share_result(self, result: dict[str, Any], caption: str | None) -> dict[str, Any]:
+        profile = self.get_profile()
+        row = {
+            "id": str(uuid4()),
+            "user_id": self.user_id,
+            "display_name": profile.get("display_name"),
+            "avatar_url": profile.get("avatar_url"),
+            "spectrum_filename": result.get("filename"),
+            "diagnostic": result.get("diagnostic", "analysis"),
+            "caption": caption,
+            "result_json": json_safe(result),
+            "created_at": _now(),
+        }
+        self.client.table("shared_results").insert(row).execute()
+        return row
+
+    def list_shared_results(self, limit: int = 50) -> list[dict[str, Any]]:
+        result = (
+            self.client.table("shared_results")
+            .select("*")
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return result.data
+
+    def delete_shared_result(self, share_id: str) -> None:
+        # RLS (shared_results: owner can delete) is the real enforcement --
+        # this .eq("user_id", ...) just avoids a needless round trip when it
+        # obviously isn't going to match.
+        self.client.table("shared_results").delete().eq("id", share_id).eq("user_id", self.user_id).execute()
 
 
 def _now() -> str:

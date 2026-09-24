@@ -1,8 +1,8 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, FileText, Loader2, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, FileText, Loader2, Share2, XCircle } from "lucide-react";
 import { useMemo, useState } from "react";
-import { exportReport, exportUrl } from "@/lib/api";
+import { exportReport, exportUrl, shareResult } from "@/lib/api";
 import { toast } from "@/components/Toast";
 import type {
   ElectronDensityResult,
@@ -22,6 +22,24 @@ export function StudioResultsTable({ result, kind }: StudioResultsTableProps) {
     return Array.from(new Set(rows.flatMap((row) => Object.keys(row))));
   }, [rows]);
   const [reportBusy, setReportBusy] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [shareCaption, setShareCaption] = useState("");
+  const [shareBusy, setShareBusy] = useState(false);
+
+  async function submitShare() {
+    if (!result) return;
+    setShareBusy(true);
+    try {
+      await shareResult(result as FitResult, shareCaption);
+      toast.success("Shared to Activity", "Other members can now see this result.");
+      setSharing(false);
+      setShareCaption("");
+    } catch (exc) {
+      toast.error("Share failed", exc instanceof Error ? exc.message : "unknown error");
+    } finally {
+      setShareBusy(false);
+    }
+  }
 
   async function generateReport(format: "html" | "pdf") {
     if (!result) return;
@@ -99,12 +117,38 @@ export function StudioResultsTable({ result, kind }: StudioResultsTableProps) {
                 {reportBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
                 PDF
               </button>
+              <button
+                className="text-button"
+                onClick={() => setSharing((value) => !value)}
+                disabled={!result}
+                title="Share this result to the Activity feed for other members"
+              >
+                <Share2 className="h-4 w-4" />
+                Share
+              </button>
             </div>
           </>
         ) : (
           <span className="text-xs text-slate-500">No analysis run yet</span>
         )}
       </div>
+      {sharing ? (
+        <div className="flex flex-wrap items-center gap-2 border-b border-line bg-slate-50 px-3 py-2">
+          <input
+            className="field flex-1"
+            placeholder="Add a caption (optional)"
+            value={shareCaption}
+            onChange={(event) => setShareCaption(event.target.value)}
+          />
+          <button className="primary-button" onClick={submitShare} disabled={shareBusy}>
+            {shareBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
+            Post to Activity
+          </button>
+          <button className="text-button" onClick={() => setSharing(false)} disabled={shareBusy}>
+            Cancel
+          </button>
+        </div>
+      ) : null}
       <div className="flex-1 overflow-auto">
         {rows.length === 0 ? (
           <div className="flex h-full items-center justify-center px-3 text-center text-xs text-slate-500">

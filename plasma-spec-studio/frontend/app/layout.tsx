@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { BarChart3, Database, FlaskConical, Layers, Microscope, MonitorDown, Upload } from "lucide-react";
+import { Activity, BarChart3, Database, FlaskConical, Layers, Microscope, MonitorDown, User, Upload } from "lucide-react";
 import { AuthButton } from "@/components/AuthButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ToastHost } from "@/components/Toast";
@@ -22,6 +22,8 @@ const nav = [
   { href: "/batch", label: "Batch", icon: Layers },
   { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
   { href: "/recipes", label: "Recipes", icon: Database },
+  { href: "/activity", label: "Activity", icon: Activity },
+  { href: "/profile", label: "Profile", icon: User },
 ];
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -52,9 +54,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <header className="sticky top-0 z-50 border-b border-line bg-panel/90 backdrop-blur-xl">
             <div className="mx-auto flex max-w-[1800px] items-center justify-between gap-4 px-4 py-2">
               <Link href="/" className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center border border-teal-200 bg-teal-50 text-teal-900" style={{ borderRadius: 8 }}>
-                  <FlaskConical className="h-5 w-5" />
-                </div>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/logo-mark.png" alt="" width={36} height={36} className="h-9 w-9" style={{ borderRadius: 8 }} />
                 <div>
                   <div className="text-base font-semibold text-ink">PlasmaSpec Studio</div>
                   <div className="hidden text-xs text-slate-500 sm:block">OES fitting for low-temperature plasma</div>

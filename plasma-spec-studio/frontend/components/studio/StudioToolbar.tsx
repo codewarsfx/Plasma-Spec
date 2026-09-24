@@ -111,7 +111,7 @@ export function StudioToolbar({ activeTool, onSelectTool, spectrumLoaded, onExpo
         })}
       </div>
       <div className="ml-auto flex min-w-0 items-center gap-2">
-        {!spectrumLoaded ? (
+        {!spectrumLoaded && activeTool !== "lines" ? (
           <span className="hidden truncate text-xs text-slate-500 md:inline">
             Select a spectrum on the left to start
           </span>

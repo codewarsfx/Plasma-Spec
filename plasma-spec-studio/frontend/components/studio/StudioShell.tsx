@@ -240,7 +240,7 @@ export function StudioShell() {
         />
       </div>
 
-      <div className="studio-plot-area min-h-0 min-w-0 overflow-hidden">
+      <div className="studio-plot-area min-h-0 min-w-0 overflow-auto">
         <StudioCenterPlot
           primary={primarySpectrum}
           overlays={overlaySpectra}
@@ -255,7 +255,7 @@ export function StudioShell() {
         />
       </div>
 
-      <div className="studio-results-area min-h-0 min-w-0 overflow-hidden">
+      <div className="studio-results-area min-h-0 min-w-0 overflow-auto">
         <StudioResultsTable result={lastResult} kind={lastResultKind} />
       </div>
 

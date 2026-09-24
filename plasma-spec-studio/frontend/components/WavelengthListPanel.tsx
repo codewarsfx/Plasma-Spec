@@ -379,7 +379,7 @@ export const WavelengthListPanel = forwardRef<WavelengthListPanelHandle, Wavelen
                     {result.results.map((row, index) => (
                       <tr key={index} className="odd:bg-white even:bg-slate-50">
                         <td className="border-b border-line px-2 py-1.5">
-                          <div className="font-medium text-ink">{row.label}</div>
+                          <div className="whitespace-nowrap font-medium text-ink">{row.label}</div>
                           {row.warnings?.length ? (
                             <div className="mt-1 text-[10px] text-amber-900">{row.warnings.join("; ")}</div>
                           ) : null}

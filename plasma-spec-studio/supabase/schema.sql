@@ -112,3 +112,48 @@ create policy "spectra bucket: owner all" on storage.objects for all
 create policy "exports bucket: owner all" on storage.objects for all
   using (bucket_id = 'exports' and (storage.foldername(name))[1] = auth.uid()::text)
   with check (bucket_id = 'exports' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- =====================================================================
+-- Migration: sharing (activity feed) + profile avatars
+-- Run this block in the SQL editor once -- it's additive to the schema
+-- above, which you've already applied.
+-- =====================================================================
+
+alter table public.profiles add column if not exists avatar_url text;
+
+-- Shared results are a self-contained snapshot (name/avatar/result copied
+-- at share time), not a live reference to fit_results -- so the feed never
+-- needs cross-user reads against profiles or fit_results, which stay
+-- owner-only.
+create table public.shared_results (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  display_name text,
+  avatar_url text,
+  spectrum_filename text,
+  diagnostic text not null,
+  caption text,
+  result_json jsonb not null,
+  created_at timestamptz not null default now()
+);
+create index shared_results_created_at_idx on public.shared_results(created_at desc);
+alter table public.shared_results enable row level security;
+create policy "shared_results: any signed-in member can read" on public.shared_results
+  for select using (auth.uid() is not null);
+create policy "shared_results: owner can insert" on public.shared_results
+  for insert with check (auth.uid() = user_id);
+create policy "shared_results: owner can delete" on public.shared_results
+  for delete using (auth.uid() = user_id);
+
+-- Avatars bucket is public-read (unlike spectra/exports) since other
+-- members need to see them, but still owner-write only.
+insert into storage.buckets (id, name, public) values ('avatars', 'avatars', true);
+
+create policy "avatars bucket: public read" on storage.objects for select
+  using (bucket_id = 'avatars');
+create policy "avatars bucket: owner insert" on storage.objects for insert
+  with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "avatars bucket: owner update" on storage.objects for update
+  using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "avatars bucket: owner delete" on storage.objects for delete
+  using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);

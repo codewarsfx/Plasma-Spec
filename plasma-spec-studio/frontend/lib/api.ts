@@ -12,7 +12,9 @@ import type {
   PeakListEntry,
   PeakListResult,
   PreprocessingOperation,
+  Profile,
   Recipe,
+  SharedResult,
   Spectrum,
   SpectrumSummary,
 } from "./types";
@@ -265,4 +267,36 @@ export function exportUrl(exportId: string) {
   const token = getCachedAccessToken();
   const query = token ? `?token=${encodeURIComponent(token)}` : "";
   return `${API_BASE}/api/exports/${exportId}${query}`;
+}
+
+export function getProfile() {
+  return request<Profile>("/api/profile");
+}
+
+export function updateProfile(displayName: string | null) {
+  return request<Profile>("/api/profile", {
+    method: "PUT",
+    body: JSON.stringify({ display_name: displayName }),
+  });
+}
+
+export function uploadAvatar(file: File) {
+  const form = new FormData();
+  form.append("file", file);
+  return request<Profile & { avatar_url: string }>("/api/profile/avatar", { method: "POST", body: form });
+}
+
+export function shareResult(result: FitResult, caption?: string) {
+  return request<SharedResult>("/api/share", {
+    method: "POST",
+    body: JSON.stringify({ result, caption: caption || null }),
+  });
+}
+
+export function listSharedResults(limit = 50) {
+  return request<{ results: SharedResult[] }>(`/api/share?limit=${limit}`);
+}
+
+export function deleteSharedResult(shareId: string) {
+  return request<{ deleted: string }>(`/api/share/${shareId}`, { method: "DELETE" });
 }

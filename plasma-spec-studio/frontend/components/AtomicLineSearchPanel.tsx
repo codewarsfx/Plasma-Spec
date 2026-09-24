@@ -1,6 +1,6 @@
 "use client";
 
-import { Database, Library, Loader2, Plus, RefreshCw, Search, Upload } from "lucide-react";
+import { ChevronDown, ChevronRight, Database, Library, Loader2, Plus, RefreshCw, Search, Upload } from "lucide-react";
 import { ChangeEvent, useEffect, useState } from "react";
 import {
   getAtomicCatalogSummary,
@@ -18,6 +18,11 @@ type AtomicLineSearchPanelProps = {
 
 const DEFAULT_NIST_SPECIES =
   "H I, He I, He II, Ar I, Ar II, O I, O II, N I, N II, C I, C II, Ne I, Ne II, Kr I, Xe I, Hg I";
+
+// Common low-temperature-plasma species -- same set Sim defaults to, so the
+// two tabs feel consistent. One click gets a first-time user real results
+// instead of an empty form.
+const SPECIES_PRESETS = ["H I", "Ar I", "O I", "N II"];
 
 export function AtomicLineSearchPanel({ onAddPeak }: AtomicLineSearchPanelProps) {
   const [speciesOptions, setSpeciesOptions] = useState<Array<{ species: string; line_count: number }>>([]);
@@ -37,6 +42,8 @@ export function AtomicLineSearchPanel({ onAddPeak }: AtomicLineSearchPanelProps)
   const [busy, setBusy] = useState(false);
   const [refreshBusy, setRefreshBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searched, setSearched] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   useEffect(() => {
     reloadCatalogMetadata();
@@ -56,15 +63,16 @@ export function AtomicLineSearchPanel({ onAddPeak }: AtomicLineSearchPanelProps)
     }
   }
 
-  async function runSearch() {
+  async function runSearch(speciesOverride?: string) {
     setBusy(true);
     setError(null);
     try {
+      const activeSpecies = speciesOverride ?? species;
       const params: Parameters<typeof searchAtomicLines>[0] = {
         max_results: 50,
         require_einstein: requireEinstein,
       };
-      if (species) params.species = [species];
+      if (activeSpecies) params.species = [activeSpecies];
       if (wavelengthMin) params.wavelength_min_nm = Number(wavelengthMin);
       if (wavelengthMax) params.wavelength_max_nm = Number(wavelengthMax);
       if (near) {
@@ -73,11 +81,17 @@ export function AtomicLineSearchPanel({ onAddPeak }: AtomicLineSearchPanelProps)
       }
       const response = await searchAtomicLines(params);
       setResults(response.results);
+      setSearched(true);
     } catch (exc) {
       setError(exc instanceof Error ? exc.message : "Atomic line search failed");
     } finally {
       setBusy(false);
     }
+  }
+
+  function runPresetSearch(preset: string) {
+    setSpecies(preset);
+    runSearch(preset);
   }
 
   async function refreshFromNist() {
@@ -125,60 +139,101 @@ export function AtomicLineSearchPanel({ onAddPeak }: AtomicLineSearchPanelProps)
             ? `${summary.line_count.toLocaleString()} lines · ${summary.species_count} species`
             : "NIST-derived"}
         </span>
-        <UploadOverridesButton onUploaded={reloadCatalogMetadata} />
       </div>
       <p className="mb-3 text-xs leading-relaxed text-slate-600">
-        Search NIST lines by species / range / proximity. Click <strong>+</strong> to add the line
-        to the Wavelength List above.
+        {onAddPeak
+          ? (
+            <>
+              Search NIST lines by species / range / proximity. Click <strong>+</strong> to add the
+              line to the Wavelength List above.
+            </>
+          )
+          : "Browse the bundled NIST atomic line catalog by species, wavelength range, or proximity to a wavelength on your spectrum."}
       </p>
+
+      <div className="mb-3 flex flex-wrap gap-2">
+        {SPECIES_PRESETS.map((preset) => (
+          <button
+            key={preset}
+            className="text-button"
+            onClick={() => runPresetSearch(preset)}
+            title={`Search the catalog for ${preset} lines`}
+          >
+            <Search className="h-4 w-4" />
+            {preset}
+          </button>
+        ))}
+      </div>
+
       <div className="mb-3 border-b border-line pb-3">
-        <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-ink">
-          <Database className="h-3.5 w-3.5 text-plasma" />
-          Official NIST ASD refresh
-          {summary?.source_counts?.nist_live ? (
-            <span className="ml-auto font-normal text-slate-500">
-              {summary.source_counts.nist_live.toLocaleString()} live-cache rows
-            </span>
-          ) : null}
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <label className="col-span-2 grid gap-1">
-            <span className="control-label">Species</span>
-            <input
-              className="field"
-              value={nistSpecies}
-              onChange={(event) => setNistSpecies(event.target.value)}
-            />
-          </label>
-          <label className="grid gap-1">
-            <span className="control-label">Min nm</span>
-            <input className="field" type="number" value={nistMin} onChange={(event) => setNistMin(event.target.value)} />
-          </label>
-          <label className="grid gap-1">
-            <span className="control-label">Max nm</span>
-            <input className="field" type="number" value={nistMax} onChange={(event) => setNistMax(event.target.value)} />
-          </label>
-          <label className="grid gap-1">
-            <span className="control-label">Mode</span>
-            <select className="field" value={nistMode} onChange={(event) => setNistMode(event.target.value as "append" | "replace")}>
-              <option value="append">Append</option>
-              <option value="replace">Replace live cache</option>
-            </select>
-          </label>
-          <label className="flex items-center gap-2 pt-6 text-xs text-slate-700">
-            <input
-              type="checkbox"
-              className="h-4 w-4 accent-teal-700"
-              checked={nistRequireEinstein}
-              onChange={(event) => setNistRequireEinstein(event.target.checked)}
-            />
-            TP only
-          </label>
-        </div>
-        <button className="text-button mt-2" onClick={refreshFromNist} disabled={refreshBusy}>
-          {refreshBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          Refresh from NIST
+        <button
+          type="button"
+          className="flex w-full items-center gap-2 text-xs font-semibold text-ink"
+          onClick={() => setShowAdvanced((value) => !value)}
+          aria-expanded={showAdvanced}
+        >
+          {showAdvanced ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+          Advanced: refresh or add lines
         </button>
+        {showAdvanced ? (
+          <div className="mt-2">
+            <p className="mb-2 text-xs leading-relaxed text-slate-500">
+              These change the catalog itself (pull fresh rows from NIST's servers, or merge in your
+              own CSV) rather than just searching it.
+            </p>
+            <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-ink">
+              <Database className="h-3.5 w-3.5 text-plasma" />
+              Official NIST ASD refresh
+              {summary?.source_counts?.nist_live ? (
+                <span className="ml-auto font-normal text-slate-500">
+                  {summary.source_counts.nist_live.toLocaleString()} live-cache rows
+                </span>
+              ) : null}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="col-span-2 grid gap-1">
+                <span className="control-label">Species</span>
+                <input
+                  className="field"
+                  value={nistSpecies}
+                  onChange={(event) => setNistSpecies(event.target.value)}
+                />
+              </label>
+              <label className="grid gap-1">
+                <span className="control-label">Min nm</span>
+                <input className="field" type="number" value={nistMin} onChange={(event) => setNistMin(event.target.value)} />
+              </label>
+              <label className="grid gap-1">
+                <span className="control-label">Max nm</span>
+                <input className="field" type="number" value={nistMax} onChange={(event) => setNistMax(event.target.value)} />
+              </label>
+              <label className="grid gap-1">
+                <span className="control-label">Mode</span>
+                <select className="field" value={nistMode} onChange={(event) => setNistMode(event.target.value as "append" | "replace")}>
+                  <option value="append">Append</option>
+                  <option value="replace">Replace live cache</option>
+                </select>
+              </label>
+              <label className="flex items-center gap-2 pt-6 text-xs text-slate-700">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-teal-700"
+                  checked={nistRequireEinstein}
+                  onChange={(event) => setNistRequireEinstein(event.target.checked)}
+                />
+                TP only
+              </label>
+            </div>
+            <button className="text-button mt-2" onClick={refreshFromNist} disabled={refreshBusy}>
+              {refreshBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              Refresh from NIST
+            </button>
+            <p className="mt-3 mb-1 text-xs text-slate-500">
+              Or merge in your own lines from a CSV (same columns as the bundled catalog):
+            </p>
+            <UploadOverridesButton onUploaded={reloadCatalogMetadata} />
+          </div>
+        ) : null}
       </div>
       <div className="grid grid-cols-2 gap-2">
         <label className="col-span-2 grid gap-1">
@@ -244,17 +299,31 @@ export function AtomicLineSearchPanel({ onAddPeak }: AtomicLineSearchPanelProps)
       </div>
 
       <div className="mt-3 flex items-center gap-2">
-        <button className="primary-button" onClick={runSearch} disabled={busy}>
+        <button className="primary-button" onClick={() => runSearch()} disabled={busy}>
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
           Search
         </button>
-        <span className="text-xs text-slate-500">{results.length} result{results.length === 1 ? "" : "s"}</span>
+        {searched ? (
+          <span className="text-xs text-slate-500">{results.length} result{results.length === 1 ? "" : "s"}</span>
+        ) : null}
       </div>
 
       {error ? (
         <div className="mt-3 border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" style={{ borderRadius: 6 }}>
           {error}
         </div>
+      ) : null}
+
+      {!searched ? (
+        <p className="mt-3 text-xs text-slate-500">
+          Enter a species or range above, or try a preset, then Search.
+        </p>
+      ) : null}
+
+      {searched && !busy && !error && results.length === 0 ? (
+        <p className="mt-3 text-xs text-slate-500">
+          No lines matched — try widening the range or clearing a filter.
+        </p>
       ) : null}
 
       {results.length > 0 ? (

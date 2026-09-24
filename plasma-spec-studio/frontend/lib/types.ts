@@ -345,3 +345,22 @@ export type BatchRunResult = {
     xlsx?: { export_id: string; path: string; kind: string };
   };
 };
+
+export type Profile = {
+  id: string;
+  email: string | null;
+  display_name: string | null;
+  avatar_url: string | null;
+};
+
+export type SharedResult = {
+  id: string;
+  user_id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  spectrum_filename: string | null;
+  diagnostic: string;
+  caption: string | null;
+  result_json: FitResult;
+  created_at: string;
+};

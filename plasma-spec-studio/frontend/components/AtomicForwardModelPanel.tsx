@@ -20,6 +20,15 @@ type Props = {
 
 type InstrumentProfile = "gaussian" | "voigt";
 
+// Same set Lines defaults its preset chips to, so the two tabs feel
+// consistent -- one click swaps in a working example instead of an empty
+// species field.
+const SPECIES_PRESETS = [
+  { label: "H I, Ar I, O I, N II", value: "H I, Ar I, O I, N II" },
+  { label: "H I only", value: "H I" },
+  { label: "Ar I, Ar II", value: "Ar I, Ar II" },
+];
+
 export function AtomicForwardModelPanel({
   spectrumId,
   preprocessing,
@@ -121,7 +130,7 @@ export function AtomicForwardModelPanel({
 
   return (
     <section className="panel p-4">
-      <div className="mb-3 flex items-center gap-2">
+      <div className="mb-2 flex items-center gap-2">
         <Atom className="h-4 w-4 text-plasma" />
         <h2 className="text-sm font-semibold text-ink">Atomic Forward Model</h2>
         <span className="ml-auto text-xs text-slate-500">
@@ -129,43 +138,74 @@ export function AtomicForwardModelPanel({
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <label className="col-span-2 grid gap-1">
-          <span className="control-label">Species</span>
-          <input
-            className="field"
-            value={speciesText}
-            onChange={(event) => setSpeciesText(event.target.value)}
-          />
-        </label>
+      <p className="mb-3 text-xs leading-relaxed text-slate-600">
+        Builds a synthetic atomic spectrum from the NIST line catalog and fits it against your
+        measured spectrum in the highlighted window below — solving for excitation temperature,
+        and optionally line shift, instrument width, and per-species scaling. Adjust Min/Max nm to
+        change which part of the plot gets fit.
+      </p>
 
-        <label className="grid gap-1">
-          <span className="control-label">Min nm</span>
-          <input
-            className="field"
-            type="number"
-            step="1"
-            value={windowMin}
-            onChange={(event) => {
-              setWindowMin(event.target.value);
-              pushWindow(event.target.value, windowMax);
-            }}
-          />
-        </label>
-        <label className="grid gap-1">
-          <span className="control-label">Max nm</span>
-          <input
-            className="field"
-            type="number"
-            step="1"
-            value={windowMax}
-            onChange={(event) => {
-              setWindowMax(event.target.value);
-              pushWindow(windowMin, event.target.value);
-            }}
-          />
-        </label>
+      {!spectrumId ? (
+        <div className="mb-3 border border-line bg-slate-50 px-3 py-2 text-xs text-slate-600" style={{ borderRadius: 6 }}>
+          Select a spectrum on the left to run a fit.
+        </div>
+      ) : null}
 
+      <div className="grid gap-3">
+        <div className="grid grid-cols-2 gap-2">
+          <h3 className="col-span-2 text-xs font-semibold text-ink">Species &amp; window</h3>
+          <label className="col-span-2 grid gap-1">
+            <span className="control-label">Species</span>
+            <input
+              className="field"
+              value={speciesText}
+              onChange={(event) => setSpeciesText(event.target.value)}
+            />
+          </label>
+          <div className="col-span-2 flex flex-wrap gap-2">
+            {SPECIES_PRESETS.map((preset) => (
+              <button
+                key={preset.label}
+                type="button"
+                className="text-button"
+                onClick={() => setSpeciesText(preset.value)}
+                title={`Use ${preset.value}`}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+
+          <label className="grid gap-1">
+            <span className="control-label">Min nm</span>
+            <input
+              className="field"
+              type="number"
+              step="1"
+              value={windowMin}
+              onChange={(event) => {
+                setWindowMin(event.target.value);
+                pushWindow(event.target.value, windowMax);
+              }}
+            />
+          </label>
+          <label className="grid gap-1">
+            <span className="control-label">Max nm</span>
+            <input
+              className="field"
+              type="number"
+              step="1"
+              value={windowMax}
+              onChange={(event) => {
+                setWindowMax(event.target.value);
+                pushWindow(windowMin, event.target.value);
+              }}
+            />
+          </label>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 border-t border-line pt-3">
+          <h3 className="col-span-2 text-xs font-semibold text-ink">Temperature &amp; line shape</h3>
         <label className="grid gap-1">
           <span className="control-label">Initial T_exc K</span>
           <input
@@ -179,7 +219,7 @@ export function AtomicForwardModelPanel({
         <label className="flex items-center gap-2 pt-6 text-xs text-slate-700">
           <input
             type="checkbox"
-            className="h-4 w-4 accent-blue-700"
+            className="h-4 w-4 accent-teal-700"
             checked={fitTemperature}
             onChange={(event) => setFitTemperature(event.target.checked)}
           />
@@ -211,7 +251,7 @@ export function AtomicForwardModelPanel({
         <label className="flex items-center gap-2 text-xs text-slate-700">
           <input
             type="checkbox"
-            className="h-4 w-4 accent-blue-700"
+            className="h-4 w-4 accent-teal-700"
             checked={fitInstrumentFwhm}
             onChange={(event) => setFitInstrumentFwhm(event.target.checked)}
           />
@@ -220,7 +260,7 @@ export function AtomicForwardModelPanel({
         <label className="flex items-center gap-2 text-xs text-slate-700">
           <input
             type="checkbox"
-            className="h-4 w-4 accent-blue-700"
+            className="h-4 w-4 accent-teal-700"
             checked={fitWavelengthShift}
             onChange={(event) => setFitWavelengthShift(event.target.checked)}
           />
@@ -237,62 +277,65 @@ export function AtomicForwardModelPanel({
             onChange={(event) => setWavelengthShift(Number(event.target.value))}
           />
         </label>
-        <label className="grid gap-1">
-          <span className="control-label">Max lines</span>
-          <input
-            className="field"
-            type="number"
-            min={1}
-            max={50000}
-            value={maxLines}
-            onChange={(event) => setMaxLines(Number(event.target.value))}
-          />
-        </label>
+          {instrumentProfile === "voigt" ? (
+            <>
+              <label className="grid gap-1">
+                <span className="control-label">Lorentz FWHM nm</span>
+                <input
+                  className="field"
+                  type="number"
+                  step="0.01"
+                  value={instrumentLorentzFwhm}
+                  onChange={(event) => setInstrumentLorentzFwhm(Number(event.target.value))}
+                />
+              </label>
+              <label className="flex items-center gap-2 pt-6 text-xs text-slate-700">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 accent-teal-700"
+                  checked={fitInstrumentLorentz}
+                  onChange={(event) => setFitInstrumentLorentz(event.target.checked)}
+                />
+                Fit Lorentz width
+              </label>
+            </>
+          ) : null}
+        </div>
 
-        {instrumentProfile === "voigt" ? (
-          <>
-            <label className="grid gap-1">
-              <span className="control-label">Lorentz FWHM nm</span>
-              <input
-                className="field"
-                type="number"
-                step="0.01"
-                value={instrumentLorentzFwhm}
-                onChange={(event) => setInstrumentLorentzFwhm(Number(event.target.value))}
-              />
-            </label>
-            <label className="flex items-center gap-2 pt-6 text-xs text-slate-700">
-              <input
-                type="checkbox"
-                className="h-4 w-4 accent-blue-700"
-                checked={fitInstrumentLorentz}
-                onChange={(event) => setFitInstrumentLorentz(event.target.checked)}
-              />
-              Fit Lorentz width
-            </label>
-          </>
-        ) : null}
-
-        <label className="flex items-center gap-2 text-xs text-slate-700">
-          <input
-            type="checkbox"
-            className="h-4 w-4 accent-blue-700"
-            checked={fitSpeciesScales}
-            onChange={(event) => setFitSpeciesScales(event.target.checked)}
-          />
-          Fit species scales
-        </label>
-        <label className="grid gap-1">
-          <span className="control-label">Baseline</span>
-          <select
-            className="field"
-            value={baselineOrder}
-            onChange={(event) => setBaselineOrder(Number(event.target.value) as 0 | 1)}
-          >
-            <option value={0}>Constant</option>
-            <option value={1}>Linear</option>
-          </select>
-        </label>
+        <div className="grid grid-cols-2 gap-2 border-t border-line pt-3">
+          <h3 className="col-span-2 text-xs font-semibold text-ink">Advanced fitting</h3>
+          <label className="grid gap-1">
+            <span className="control-label">Max lines</span>
+            <input
+              className="field"
+              type="number"
+              min={1}
+              max={50000}
+              value={maxLines}
+              onChange={(event) => setMaxLines(Number(event.target.value))}
+            />
+          </label>
+          <label className="grid gap-1">
+            <span className="control-label">Baseline</span>
+            <select
+              className="field"
+              value={baselineOrder}
+              onChange={(event) => setBaselineOrder(Number(event.target.value) as 0 | 1)}
+            >
+              <option value={0}>Constant</option>
+              <option value={1}>Linear</option>
+            </select>
+          </label>
+          <label className="col-span-2 flex items-center gap-2 text-xs text-slate-700">
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-teal-700"
+              checked={fitSpeciesScales}
+              onChange={(event) => setFitSpeciesScales(event.target.checked)}
+            />
+            Fit species scales
+          </label>
+        </div>
       </div>
 
       <div className="mt-3 flex items-center gap-2">
@@ -304,7 +347,6 @@ export function AtomicForwardModelPanel({
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
           Fit atomic model
         </button>
-        {!spectrumId ? <span className="text-xs text-slate-500">Select a spectrum</span> : null}
       </div>
 
       {error ? (
@@ -315,6 +357,10 @@ export function AtomicForwardModelPanel({
 
       {result ? (
         <div className="mt-3 grid gap-3">
+          <p className="text-xs text-slate-500">
+            Residuals are on the plot&apos;s Residuals tab; the table below shows which catalog lines
+            drove this fit.
+          </p>
           <div className="grid grid-cols-2 gap-2 text-xs">
             <Metric label="T_exc" value={formatNumber(params.temperature_K, " K")} />
             <Metric label="R²" value={formatNumber(result.metrics?.r2)} />

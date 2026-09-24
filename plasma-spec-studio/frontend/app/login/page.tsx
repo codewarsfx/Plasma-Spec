@@ -2,7 +2,6 @@
 
 import { FormEvent, Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { FlaskConical } from "lucide-react";
 
 import { supabase } from "@/lib/supabase/client";
 
@@ -79,9 +78,8 @@ function LoginContent() {
 
   return (
     <div className="mx-auto flex min-h-[70vh] max-w-sm flex-col items-center justify-center gap-6 px-4 text-center">
-      <div className="flex h-12 w-12 items-center justify-center border border-teal-200 bg-teal-50 text-teal-900" style={{ borderRadius: 10 }}>
-        <FlaskConical className="h-6 w-6" />
-      </div>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/logo-mark.png" alt="" width={48} height={48} className="h-12 w-12" style={{ borderRadius: 10 }} />
       <div>
         <h1 className="text-xl font-semibold text-ink">
           {mode === "signup" ? "Create your account" : "Sign in to PlasmaSpec Studio"}
